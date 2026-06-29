@@ -1,0 +1,427 @@
+<script>
+
+const App = {
+
+    page: "dashboard",
+
+    init() {
+
+        this.bindMenu();
+        this.bindTheme();
+        this.bindSidebar();
+        this.bindRefresh();
+
+        this.updateActiveMenu();
+
+        this.navigate("dashboard");
+
+        console.log("Property Manager pornit");
+
+    },
+
+    bindMenu() {
+
+        document.addEventListener("click", function(e){
+
+            const item = e.target.closest("[data-page]");
+
+            if(!item) return;
+
+            e.preventDefault();
+
+            App.navigate(item.dataset.page);
+
+        });
+
+    },
+
+    bindSidebar(){
+
+        const btn=document.getElementById("btnSidebar");
+
+        if(!btn) return;
+
+        btn.addEventListener("click",function(){
+
+            document
+                .getElementById("sidebar")
+                .classList.toggle("open");
+
+        });
+
+    },
+
+    bindTheme(){
+
+        const btn=document.getElementById("btnTheme");
+
+        if(!btn) return;
+
+        if(localStorage.getItem("theme")=="dark"){
+            document.body.classList.add("dark");
+        }
+
+        btn.addEventListener("click",function(){
+
+            document.body.classList.toggle("dark");
+
+            localStorage.setItem(
+                "theme",
+                document.body.classList.contains("dark")
+                ? "dark"
+                : "light"
+            );
+
+        });
+
+    },
+
+    bindRefresh(){
+
+        const btn=document.getElementById("btnRefresh");
+
+        if(!btn) return;
+
+        btn.addEventListener("click",function(){
+
+            App.navigate(App.page);
+
+            App.toast("Pagina actualizată");
+
+        });
+
+    },
+
+    navigate(page){
+
+        this.page=page;
+
+        this.updateActiveMenu();
+
+        const content=document.getElementById("app-content");
+
+        switch(page){
+
+            case "dashboard":
+
+                content.innerHTML=Pages.dashboard();
+
+                Charts.load();
+
+                break;
+
+            case "properties":
+
+                content.innerHTML=Pages.properties();
+
+                break;
+
+            case "tenants":
+
+                content.innerHTML=Pages.tenants();
+
+                break;
+
+            case "invoices":
+
+                content.innerHTML=Pages.invoices();
+
+                break;
+
+            case "utilities":
+
+                content.innerHTML=Pages.utilities();
+
+                break;
+
+            case "financial":
+
+                content.innerHTML=Pages.financial();
+
+                break;
+
+            case "whatsapp":
+
+                content.innerHTML=Pages.whatsapp();
+
+                break;
+
+            case "reports":
+
+                content.innerHTML=Pages.reports();
+
+                break;
+
+            case "settings":
+
+                content.innerHTML=Pages.settings();
+
+                break;
+
+        }
+
+    },
+
+    updateActiveMenu(){
+
+        document.querySelectorAll("[data-page]").forEach(function(item){
+
+            item.classList.remove("active");
+
+            if(item.dataset.page==App.page){
+                item.classList.add("active");
+            }
+
+        });
+
+    },
+
+    loader(show){
+
+        const loader=document.getElementById("loader");
+
+        if(!loader) return;
+
+        if(show){
+
+            loader.classList.remove("d-none");
+
+        }else{
+
+            loader.classList.add("d-none");
+
+        }
+
+    },
+
+    toast(message){
+
+        const container=document.getElementById("toastContainer");
+
+        if(!container) return;
+
+        const id="toast"+Date.now();
+
+        container.insertAdjacentHTML("beforeend",
+
+        `<div id="${id}" class="toast show">
+
+            <div class="toast-body">
+
+                ${message}
+
+            </div>
+
+        </div>`);
+
+        setTimeout(function(){
+
+            const t=document.getElementById(id);
+
+            if(t) t.remove();
+
+        },3000);
+
+    }
+
+};
+
+const Pages={
+
+dashboard(){
+
+return `
+
+<h2 class="mb-4">
+
+Dashboard
+
+</h2>
+
+<div class="cards">
+
+<div class="kpi-card">
+
+<div class="kpi-title">
+
+🏠 Proprietăți
+
+</div>
+
+<div class="kpi-value">
+
+5
+
+</div>
+
+</div>
+
+<div class="kpi-card">
+
+<div class="kpi-title">
+
+👥 Chiriași
+
+</div>
+
+<div class="kpi-value">
+
+5
+
+</div>
+
+</div>
+
+<div class="kpi-card">
+
+<div class="kpi-title">
+
+📄 Facturi
+
+</div>
+
+<div class="kpi-value">
+
+12
+
+</div>
+
+</div>
+
+<div class="kpi-card">
+
+<div class="kpi-title">
+
+⚡ Utilități
+
+</div>
+
+<div class="kpi-value">
+
+1430 RON
+
+</div>
+
+</div>
+
+</div>
+
+<div class="panel">
+
+<div class="panel-title">
+
+Cheltuieli Utilități
+
+</div>
+
+<canvas id="chartUtilities"></canvas>
+
+</div>
+
+`;
+
+},
+
+properties(){
+
+return "<h2>🏠 Proprietăți</h2><p>Modul în dezvoltare...</p>";
+
+},
+
+tenants(){
+
+return "<h2>👥 Chiriași</h2><p>Modul în dezvoltare...</p>";
+
+},
+
+invoices(){
+
+return "<h2>📄 Facturi</h2><p>Modul în dezvoltare...</p>";
+
+},
+
+utilities(){
+
+return "<h2>⚡ Utilități</h2><p>Modul în dezvoltare...</p>";
+
+},
+
+financial(){
+
+return "<h2>💰 Financiar</h2><p>Modul în dezvoltare...</p>";
+
+},
+
+whatsapp(){
+
+return "<h2>📲 WhatsApp</h2><p>Modul în dezvoltare...</p>";
+
+},
+
+reports(){
+
+return "<h2>📊 Rapoarte</h2><p>Modul în dezvoltare...</p>";
+
+},
+
+settings(){
+
+return "<h2>⚙ Setări</h2><p>Modul în dezvoltare...</p>";
+
+}
+
+};
+
+const Charts={
+
+load(){
+
+    const canvas=document.getElementById("chartUtilities");
+
+    if(!canvas) return;
+
+    if(window.utilityChart){
+
+        window.utilityChart.destroy();
+
+    }
+
+    window.utilityChart=new Chart(canvas,{
+
+        type:"bar",
+
+        data:{
+
+            labels:["Ian","Feb","Mar","Apr","Mai","Iun"],
+
+            datasets:[{
+
+                label:"Utilități",
+
+                data:[420,350,480,510,390,560]
+
+            }]
+
+        },
+
+        options:{
+
+            responsive:true,
+
+            maintainAspectRatio:false
+
+        }
+
+    });
+
+}
+
+};
+
+document.addEventListener("DOMContentLoaded",function(){
+
+    App.init();
+
+});
+
+</script>

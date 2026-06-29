@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ro">
+
+<head>
+
+  <base target="_top">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Property Manager</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+  <!-- Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- ChartJS -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <?!= include("Css"); ?>
+
+</head>
+
+<body>
+
+<div id="loader" class="loader-overlay d-none">
+
+    <div class="text-center">
+
+        <div class="spinner-border text-primary"></div>
+
+        <div class="mt-3 fw-bold">
+
+            Se încarcă...
+
+        </div>
+
+    </div>
+
+</div>
+
+<div id="toastContainer"
+     class="toast-container position-fixed bottom-0 end-0 p-3">
+
+</div>
+
+<div class="app">
+
+    <!-- Sidebar -->
+
+    <aside id="sidebar">
+
+        <?!= include("Sidebar"); ?>
+
+    </aside>
+
+    <!-- Main -->
+
+    <main id="main">
+
+        <!-- Topbar -->
+
+        <header id="topbar">
+
+            <?!= include("Topbar"); ?>
+
+        </header>
+
+        <!-- Dynamic content -->
+
+        <section id="app-content">
+
+            <?!= include("Dashboard"); ?>
+
+        </section>
+
+    </main>
+
+</div>
+
+<div class="modal fade"
+     id="globalModal"
+     tabindex="-1">
+
+    <div class="modal-dialog modal-lg">
+
+        <div class="modal-content">
+
+            <div class="modal-header">
+
+                <h5 id="modalTitle">
+
+                    Property Manager
+
+                </h5>
+
+                <button
+                    class="btn-close"
+                    data-bs-dismiss="modal">
+                </button>
+
+            </div>
+
+            <div
+                id="modalBody"
+                class="modal-body">
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+const APP={
+
+    version:"1.0",
+
+    currentPage:"dashboard",
+
+    user:null,
+
+    dark:false
+
+};
+
+</script>
+
+<?!= include("Javascript"); ?>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+
+</html>
