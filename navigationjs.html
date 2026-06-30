@@ -1,0 +1,52 @@
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const menuItems = document.querySelectorAll("#sidebar-menu .list-group-item");
+    const appContent = document.getElementById("app-content");
+    const loader = document.getElementById("loader");
+    const topbarTitle = document.querySelector("#topbar h4");
+
+    menuItems.forEach(item => {
+        item.addEventListener("click", function(e) {
+            e.preventDefault();
+            
+            if (this.classList.contains("active")) return;
+
+            const targetModule = this.getAttribute("data-target");
+            
+            menuItems.forEach(i => i.classList.remove("active"));
+            this.classList.add("active");
+
+            if (topbarTitle) {
+                topbarTitle.textContent = this.textContent.trim();
+            }
+
+            loadModule(targetModule);
+        });
+    });
+
+    function loadModule(moduleName) {
+        if (loader) loader.classList.remove("d-none");
+
+        google.script.run
+            .withSuccessHandler(function(htmlContent) {
+                appContent.innerHTML = htmlContent;
+                
+                // Execută scripturile din interiorul modulului încărcat
+                const scripts = appContent.querySelectorAll("script");
+                scripts.forEach(oldScript => {
+                    const newScript = document.createElement("script");
+                    Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+                    newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+                    oldScript.parentNode.replaceChild(newScript, oldScript);
+                });
+
+                if (loader) loader.classList.add("d-none");
+            })
+            .withFailureHandler(function(err) {
+                appContent.innerHTML = `<div class="alert alert-danger m-3">Eroare la încărcarea modulului: ${err.message}</div>`;
+                if (loader) loader.classList.add("d-none");
+            })
+            .apiGetModuleHtml(moduleName); // Execută ruta din api.gs
+    }
+});
+</script>

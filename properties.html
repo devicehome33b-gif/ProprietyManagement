@@ -1,0 +1,209 @@
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="bi bi-building me-2"></i>Management Proprietăți</h2>
+            <p class="text-muted small mb-0">Vizualizează, adaugă și editează proprietățile imobiliare din portofoliu.</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="loadProperties()">
+                <i class="bi bi-arrow-clockwise me-1"></i> Actualizare
+            </button>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAddProperty">
+                <i class="bi bi-plus-lg me-1"></i> Adaugă Proprietate
+            </button>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Denumire</th>
+                            <th>Tip</th>
+                            <th>Adresă completă</th>
+                            <th>Oraș</th>
+                            <th>Proprietar</th>
+                            <th>Status</th>
+                            <th class="pe-4">Observații</th>
+                        </tr>
+                    </thead>
+                    <tbody id="properties-table-body">
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <div class="text-muted small mt-2">Se încarcă proprietățile...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalAddProperty" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle me-2 text-success"></i>Proprietate Nouă</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="form-add-property" onsubmit="handleFormSubmit(event)">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Denumire Proprietate *</label>
+                        <input type="text" class="form-control" name="denumire" required placeholder="Ex: Apartament 3 camere">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Tip Proprietate *</label>
+                        <select class="form-select" name="tip" required>
+                            <option value="Apartament">Apartament</option>
+                            <option value="Garsoniera">Garsonieră</option>
+                            <option value="Casa">Casă</option>
+                            <option value="Birou / Comercial">Birou / Comercial</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Adresă completă *</label>
+                        <input type="text" class="form-control" name="adresa" required placeholder="Strada, Numar, Bloc...">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-bold">Oraș *</label>
+                            <input type="text" class="form-control" name="oras" required placeholder="Ex: București">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-bold">Proprietar / Manager *</label>
+                            <input type="text" class="form-control" name="proprietar" required placeholder="Nume">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Status Inițial *</label>
+                        <select class="form-select" name="status">
+                            <option value="Activ">Activ (Disponibil)</option>
+                            <option value="Inactiv">Inactiv</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Observații</label>
+                        <textarea class="form-control" name="observatii" rows="2" placeholder="Opțional..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer table-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anulează</button>
+                    <button type="submit" class="btn btn-success">Salvează Proprietatea</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Punct de pornire automat la injectarea ferestrei
+(function() {
+    loadProperties();
+})();
+
+function loadProperties() {
+    const tbody = document.getElementById("properties-table-body");
+    if (!tbody) return;
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="7" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="text-muted small mt-2">Se încarcă proprietățile...</div>
+            </td>
+        </tr>
+    `;
+
+    google.script.run
+        .withSuccessHandler(function(properties) {
+            if (!properties || properties.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="bi bi-info-circle me-1"></i> Nu există proprietăți înregistrate.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            let html = "";
+            properties.forEach(prop => {
+                const badgeClass = prop.status === "Activ" ? "bg-success text-white" : "bg-secondary text-white";
+                html += `
+                    <tr>
+                        <td class="ps-4 fw-bold">${prop.denumire}</td>
+                        <td><span class="badge bg-light text-dark border">${prop.tip}</span></td>
+                        <td>${prop.adresa}</td>
+                        <td>${prop.oras}</td>
+                        <td>${prop.proprietar}</td>
+                        <td><span class="badge ${badgeClass}">${prop.status}</span></td>
+                        <td class="pe-4 text-muted small">${prop.observatii || "-"}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        })
+        .withFailureHandler(function(err) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Eroare încărcare server: ${err.message}
+                    </td>
+                </tr>
+            `;
+        })
+        .apiGetProperties();
+}
+
+function handleFormSubmit(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Se salvează...`;
+
+    const formData = new FormData(form);
+    const propertyObject = {
+        denumire: formData.get("denumire"),
+        tip: formData.get("tip"),
+        adresa: formData.get("adresa"),
+        oras: formData.get("oras"),
+        proprietar: formData.get("proprietar"),
+        status: formData.get("status"),
+        observatii: formData.get("observatii")
+    };
+
+    google.script.run
+        .withSuccessHandler(function(response) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+
+            if (response && response.success) {
+                // Închidem modalul manual schimbând atributele dacă Bootstrap nu este instanțiat global
+                const modalEl = document.getElementById('modalAddProperty');
+                const modalBtnClose = modalEl.querySelector('.btn-close');
+                if (modalBtnClose) modalBtnClose.click();
+                
+                form.reset();
+                loadProperties();
+            } else {
+                alert("Eroare la salvare.");
+            }
+        })
+        .withFailureHandler(function(err) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            alert("Eroare de comunicare cu serverul: " + err.message);
+        })
+        .apiSaveProperty(propertyObject);
+}
+</script>
