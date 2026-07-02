@@ -1,0 +1,340 @@
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="bi bi-lightning-charge-fill me-2"></i>Gestiune Utilități</h2>
+            <p class="text-muted small mb-0">Încarcă și gestionează facturile de utilități pentru cele 5 locații.</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="loadUtilities()">
+                <i class="bi bi-arrow-clockwise me-1"></i> Actualizare
+            </button>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAddUtility">
+                <i class="bi bi-plus-lg me-1"></i> Adaugă Factură
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="cards mb-4">
+        <div class="kpi-card">
+            <div class="kpi-title">Total Utilități</div>
+            <div class="kpi-value" id="total-utilities">0 RON</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Facturi această lună</div>
+            <div class="kpi-value" id="count-utilities">0</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Locații cu facturi</div>
+            <div class="kpi-value" id="locations-count">0</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Media pe locație</div>
+            <div class="kpi-value" id="average-utilities">0 RON</div>
+        </div>
+    </div>
+
+    <!-- Facturi tabel -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Data</th>
+                            <th>Locație</th>
+                            <th>Tip Utilitate</th>
+                            <th>Valoare (RON)</th>
+                            <th>Furnizor</th>
+                            <th>Perioada</th>
+                            <th>Status</th>
+                            <th class="pe-4">Acțiuni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="utilities-table-body">
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <div class="text-muted small mt-2">Se încarcă facturile...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rezumat pe locații -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Cheltuieli pe Locații</h5>
+        </div>
+        <div class="card-body">
+            <div id="location-summary" class="row">
+                <div class="col-md-6 mb-3">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adaugă Factură -->
+<div class="modal fade" id="modalAddUtility" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Adaugă Factură Utilitate</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="form-add-utility" onsubmit="handleUtilitySubmit(event)">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Data Facturii *</label>
+                        <input type="date" class="form-control" name="data_factura" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Locație *</label>
+                        <select class="form-select" name="locatie" required>
+                            <option value="">-- Selectează Locație --</option>
+                            <option value="Locatie 1">Locație 1</option>
+                            <option value="Locatie 2">Locație 2</option>
+                            <option value="Locatie 3">Locație 3</option>
+                            <option value="Locatie 4">Locație 4</option>
+                            <option value="Locatie 5">Locație 5</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Tip Utilitate *</label>
+                        <select class="form-select" name="tip_utilitate" required>
+                            <option value="">-- Selectează --</option>
+                            <option value="Apa">Apă</option>
+                            <option value="Electricitate">Electricitate</option>
+                            <option value="Gaze">Gaze</option>
+                            <option value="Canalizare">Canalizare</option>
+                            <option value="Incalzire">Încălzire</option>
+                            <option value="Gunoi">Colectare Gunoi</option>
+                            <option value="Internet">Internet/Telefon</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-bold">Valoare (RON) *</label>
+                            <input type="number" step="0.01" class="form-control" name="valoare" required placeholder="0.00">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-bold">Perioada (Luna/An) *</label>
+                            <input type="text" class="form-control" name="perioada" required placeholder="Ex: Iulie 2026">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Furnizor</label>
+                        <input type="text" class="form-control" name="furnizor" placeholder="Numele furnizorului (opțional)">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Status</label>
+                        <select class="form-select" name="status">
+                            <option value="Plătit">Plătit</option>
+                            <option value="Neplatit">Neplătit</option>
+                            <option value="In asteptare">În așteptare</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Observații</label>
+                        <textarea class="form-control" name="observatii" rows="2" placeholder="Opțional..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer table-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anulează</button>
+                    <button type="submit" class="btn btn-success">Salvează Factură</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    loadUtilities();
+})();
+
+function loadUtilities() {
+    const tbody = document.getElementById("utilities-table-body");
+    if (!tbody) return;
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="8" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="text-muted small mt-2">Se încarcă facturile...</div>
+            </td>
+        </tr>
+    `;
+
+    google.script.run
+        .withSuccessHandler(function(utilities) {
+            renderUtilitiesTable(utilities);
+            updateUtilityKPIs(utilities);
+        })
+        .withFailureHandler(function(err) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Eroare: ${err.message}
+                    </td>
+                </tr>
+            `;
+        })
+        .apiGetUtilities();
+}
+
+function renderUtilitiesTable(utilities) {
+    const tbody = document.getElementById("utilities-table-body");
+    
+    if (!utilities || utilities.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4 text-muted">
+                    <i class="bi bi-info-circle me-1"></i> Nu există facturi înregistrate.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    let html = "";
+    utilities.forEach((util, index) => {
+        const badgeClass = util.status === "Plătit" ? "bg-success text-white" : (util.status === "Neplătit" ? "bg-danger text-white" : "bg-warning text-dark");
+        const formattedDate = new Date(util.data_factura).toLocaleDateString('ro-RO');
+        
+        html += `
+            <tr>
+                <td class="ps-4">${formattedDate}</td>
+                <td><span class="badge bg-info text-dark">${util.locatie}</span></td>
+                <td>${util.tip_utilitate}</td>
+                <td class="fw-bold">${parseFloat(util.valoare).toFixed(2)} RON</td>
+                <td>${util.furnizor || "-"}</td>
+                <td><small>${util.perioada}</small></td>
+                <td><span class="badge ${badgeClass}">${util.status}</span></td>
+                <td class="pe-4">
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteUtility(${index})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = html;
+}
+
+function updateUtilityKPIs(utilities) {
+    let totalValue = 0;
+    const locations = new Set();
+
+    utilities.forEach(util => {
+        totalValue += parseFloat(util.valoare) || 0;
+        locations.add(util.locatie);
+    });
+
+    const average = locations.size > 0 ? (totalValue / locations.size).toFixed(2) : 0;
+
+    document.getElementById("total-utilities").textContent = totalValue.toFixed(2) + " RON";
+    document.getElementById("count-utilities").textContent = utilities.length;
+    document.getElementById("locations-count").textContent = locations.size;
+    document.getElementById("average-utilities").textContent = average + " RON";
+
+    renderLocationSummary(utilities, locations);
+}
+
+function renderLocationSummary(utilities, locations) {
+    const summaryDiv = document.getElementById("location-summary");
+    let html = "";
+
+    const locationTotals = {};
+    utilities.forEach(util => {
+        if (!locationTotals[util.locatie]) {
+            locationTotals[util.locatie] = 0;
+        }
+        locationTotals[util.locatie] += parseFloat(util.valoare) || 0;
+    });
+
+    Object.keys(locationTotals).sort().forEach(loc => {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="p-3 border rounded bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">${loc}</h6>
+                            <p class="text-muted small mb-0">Cheltuieli totale</p>
+                        </div>
+                        <div class="text-end">
+                            <h4 class="mb-0 text-success">${locationTotals[loc].toFixed(2)} RON</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    summaryDiv.innerHTML = html || `<div class="col-12 text-muted">Nu sunt date de afișat.</div>`;
+}
+
+function handleUtilitySubmit(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Se salvează...`;
+
+    const formData = new FormData(form);
+    const utilityObject = {
+        data_factura: formData.get("data_factura"),
+        locatie: formData.get("locatie"),
+        tip_utilitate: formData.get("tip_utilitate"),
+        valoare: formData.get("valoare"),
+        furnizor: formData.get("furnizor"),
+        perioada: formData.get("perioada"),
+        status: formData.get("status"),
+        observatii: formData.get("observatii")
+    };
+
+    google.script.run
+        .withSuccessHandler(function(response) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+
+            if (response && response.success) {
+                const modalEl = document.getElementById('modalAddUtility');
+                const modalBtnClose = modalEl.querySelector('.btn-close');
+                if (modalBtnClose) modalBtnClose.click();
+                
+                form.reset();
+                loadUtilities();
+            } else {
+                alert("Eroare la salvare.");
+            }
+        })
+        .withFailureHandler(function(err) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            alert("Eroare de comunicare: " + err.message);
+        })
+        .apiSaveUtility(utilityObject);
+}
+
+function deleteUtility(index) {
+    if (!confirm("Ești sigur că vrei să ștergi această factură?")) return;
+    
+    google.script.run
+        .withSuccessHandler(function() {
+            loadUtilities();
+        })
+        .withFailureHandler(function(err) {
+            alert("Eroare la ștergere: " + err.message);
+        })
+        .apiDeleteUtility(index);
+}
+</script>
