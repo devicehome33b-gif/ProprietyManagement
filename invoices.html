@@ -1,0 +1,278 @@
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="bi bi-file-earmark-text me-2"></i>Gestiune Facturi</h2>
+            <p class="text-muted small mb-0">Vizualizează și gestionează toate facturile imobiliare.</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="loadInvoices()">
+                <i class="bi bi-arrow-clockwise me-1"></i> Actualizare
+            </button>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAddInvoice">
+                <i class="bi bi-plus-lg me-1"></i> Adaugă Factură
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="cards mb-4">
+        <div class="kpi-card">
+            <div class="kpi-title">Total Facturi</div>
+            <div class="kpi-value" id="total-invoices">0 RON</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Facturi emise</div>
+            <div class="kpi-value" id="count-invoices">0</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Plătite</div>
+            <div class="kpi-value" id="paid-invoices">0 RON</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-title">Neplatite</div>
+            <div class="kpi-value text-danger" id="unpaid-invoices">0 RON</div>
+        </div>
+    </div>
+
+    <!-- Facturi tabel -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Nr. Factură</th>
+                            <th>Data</th>
+                            <th>Proprietate</th>
+                            <th>Descriere</th>
+                            <th>Valoare (RON)</th>
+                            <th>Scadență</th>
+                            <th>Status</th>
+                            <th class="pe-4">Acțiuni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoices-table-body">
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <div class="text-muted small mt-2">Se încarcă facturile...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adaugă Factură -->
+<div class="modal fade" id="modalAddInvoice" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-plus me-2 text-primary"></i>Adaugă Factură</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="form-add-invoice" onsubmit="handleInvoiceSubmit(event)">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Număr Factură *</label>
+                        <input type="text" class="form-control" name="nr_factura" required placeholder="Ex: FAC-2026-001">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Data Facturii *</label>
+                        <input type="date" class="form-control" name="data_factura" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Proprietate *</label>
+                        <input type="text" class="form-control" name="proprietate" required placeholder="Nume proprietate">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Descriere *</label>
+                        <textarea class="form-control" name="descriere" rows="2" required placeholder="Descrierea facturii"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-bold">Valoare (RON) *</label>
+                            <input type="number" step="0.01" class="form-control" name="valoare" required placeholder="0.00">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label small fw-bold">Data Scadenței *</label>
+                            <input type="date" class="form-control" name="data_scadenta" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Status</label>
+                        <select class="form-select" name="status">
+                            <option value="Plătit">Plătit</option>
+                            <option value="Neplatit">Neplătit</option>
+                            <option value="Partial">Parțial plătit</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer table-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anulează</button>
+                    <button type="submit" class="btn btn-success">Salvează Factură</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    loadInvoices();
+})();
+
+function loadInvoices() {
+    const tbody = document.getElementById("invoices-table-body");
+    if (!tbody) return;
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="8" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="text-muted small mt-2">Se încarcă facturile...</div>
+            </td>
+        </tr>
+    `;
+
+    google.script.run
+        .withSuccessHandler(function(invoices) {
+            renderInvoicesTable(invoices);
+            updateInvoiceKPIs(invoices);
+        })
+        .withFailureHandler(function(err) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Eroare: ${err.message}
+                    </td>
+                </tr>
+            `;
+        })
+        .apiGetInvoices();
+}
+
+function renderInvoicesTable(invoices) {
+    const tbody = document.getElementById("invoices-table-body");
+    
+    if (!invoices || invoices.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4 text-muted">
+                    <i class="bi bi-info-circle me-1"></i> Nu există facturi înregistrate.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    let html = "";
+    invoices.forEach((inv, index) => {
+        const badgeClass = inv.status === "Plătit" ? "bg-success text-white" : (inv.status === "Neplatit" ? "bg-danger text-white" : "bg-warning text-dark");
+        const formattedDate = new Date(inv.data_factura).toLocaleDateString('ro-RO');
+        const formattedDueDate = new Date(inv.data_scadenta).toLocaleDateString('ro-RO');
+        
+        html += `
+            <tr>
+                <td class="ps-4 fw-bold">${inv.nr_factura}</td>
+                <td>${formattedDate}</td>
+                <td>${inv.proprietate}</td>
+                <td><small>${inv.descriere}</small></td>
+                <td>${parseFloat(inv.valoare).toFixed(2)} RON</td>
+                <td>${formattedDueDate}</td>
+                <td><span class="badge ${badgeClass}">${inv.status}</span></td>
+                <td class="pe-4">
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteInvoice(${index})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = html;
+}
+
+function updateInvoiceKPIs(invoices) {
+    let totalValue = 0;
+    let paidValue = 0;
+    let unpaidValue = 0;
+
+    invoices.forEach(inv => {
+        const value = parseFloat(inv.valoare) || 0;
+        totalValue += value;
+        
+        if (inv.status === "Plătit") {
+            paidValue += value;
+        } else if (inv.status === "Neplatit") {
+            unpaidValue += value;
+        } else {
+            unpaidValue += value * 0.5; // Parțial plătit
+        }
+    });
+
+    document.getElementById("total-invoices").textContent = totalValue.toFixed(2) + " RON";
+    document.getElementById("count-invoices").textContent = invoices.length;
+    document.getElementById("paid-invoices").textContent = paidValue.toFixed(2) + " RON";
+    document.getElementById("unpaid-invoices").textContent = unpaidValue.toFixed(2) + " RON";
+}
+
+function handleInvoiceSubmit(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Se salvează...`;
+
+    const formData = new FormData(form);
+    const invoiceObject = {
+        nr_factura: formData.get("nr_factura"),
+        data_factura: formData.get("data_factura"),
+        proprietate: formData.get("proprietate"),
+        descriere: formData.get("descriere"),
+        valoare: formData.get("valoare"),
+        data_scadenta: formData.get("data_scadenta"),
+        status: formData.get("status")
+    };
+
+    google.script.run
+        .withSuccessHandler(function(response) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+
+            if (response && response.success) {
+                const modalEl = document.getElementById('modalAddInvoice');
+                const modalBtnClose = modalEl.querySelector('.btn-close');
+                if (modalBtnClose) modalBtnClose.click();
+                
+                form.reset();
+                loadInvoices();
+            } else {
+                alert("Eroare la salvare.");
+            }
+        })
+        .withFailureHandler(function(err) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            alert("Eroare de comunicare: " + err.message);
+        })
+        .apiSaveInvoice(invoiceObject);
+}
+
+function deleteInvoice(index) {
+    if (!confirm("Ești sigur că vrei să ștergi această factură?")) return;
+    
+    google.script.run
+        .withSuccessHandler(function() {
+            loadInvoices();
+        })
+        .withFailureHandler(function(err) {
+            alert("Eroare la ștergere: " + err.message);
+        })
+        .apiDeleteInvoice(index);
+}
+</script>
