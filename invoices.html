@@ -1,278 +1,613 @@
 <div class="container-fluid p-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="mb-1"><i class="bi bi-file-earmark-text me-2"></i>Gestiune Facturi</h2>
-            <p class="text-muted small mb-0">Vizualizează și gestionează toate facturile imobiliare.</p>
+            <h2 class="mb-1"><i class="bi bi-receipt me-2"></i>Facturi Utilități</h2>
+            <p class="text-muted small mb-0">
+                Facturi importate automat din Drive prin OCR.
+                <a href="#" onclick="return sarilaSetari(event)">Vezi unde pui facturile noi</a>.
+            </p>
         </div>
-        <div>
-            <button class="btn btn-outline-primary me-2" onclick="loadInvoices()">
-                <i class="bi bi-arrow-clockwise me-1"></i> Actualizare
+        <div class="d-flex align-items-center gap-2">
+            <select class="form-select form-select-sm" id="monthFilterSelect" style="width:auto;" onchange="onMonthFilterChange(this.value)">
+                <option value="">Toate lunile (grupat)</option>
+            </select>
+            <button class="btn btn-outline-primary" onclick="loadInvoices()" title="Actualizare">
+                <i class="bi bi-arrow-clockwise"></i>
             </button>
-            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAddInvoice">
-                <i class="bi bi-plus-lg me-1"></i> Adaugă Factură
+            <button class="btn btn-success" id="btnImportDrive" onclick="importFromDrive()">
+                <i class="bi bi-cloud-arrow-down me-1"></i> Import din Drive (OCR)
+            </button>
+            <button class="btn btn-outline-secondary" onclick="setupDriveFoldersUI(this)" title="Creează foldere în Drive">
+                <i class="bi bi-folder-plus"></i>
             </button>
         </div>
     </div>
 
-    <!-- KPI Cards -->
-    <div class="cards mb-4">
-        <div class="kpi-card">
-            <div class="kpi-title">Total Facturi</div>
-            <div class="kpi-value" id="total-invoices">0 RON</div>
+    <div id="importSummary"></div>
+
+    <!-- Carduri cu total pe proprietate (respectă filtrul de lună) - click pe un card filtrează tabelul -->
+    <div id="propertyTotals" class="row g-3 mb-4"></div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2" id="filterBar" style="display:none;">
+        <div class="small text-muted">
+            Filtrat pe: <strong id="filterLabel"></strong>
         </div>
-        <div class="kpi-card">
-            <div class="kpi-title">Facturi emise</div>
-            <div class="kpi-value" id="count-invoices">0</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-title">Plătite</div>
-            <div class="kpi-value" id="paid-invoices">0 RON</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-title">Neplatite</div>
-            <div class="kpi-value text-danger" id="unpaid-invoices">0 RON</div>
-        </div>
+        <button class="btn btn-sm btn-outline-secondary" onclick="clearPropertyFilter()">
+            <i class="bi bi-x-lg me-1"></i> Elimină filtrul de proprietate
+        </button>
     </div>
 
-    <!-- Facturi tabel -->
-    <div class="card shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-4">Nr. Factură</th>
-                            <th>Data</th>
-                            <th>Proprietate</th>
-                            <th>Descriere</th>
-                            <th>Valoare (RON)</th>
-                            <th>Scadență</th>
-                            <th>Status</th>
-                            <th class="pe-4">Acțiuni</th>
-                        </tr>
-                    </thead>
-                    <tbody id="invoices-table-body">
-                        <tr>
-                            <td colspan="8" class="text-center py-5">
-                                <div class="spinner-border text-primary" role="status"></div>
-                                <div class="text-muted small mt-2">Se încarcă facturile...</div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+    <!-- Container principal: fie tabel plat (lună specifică selectată), fie accordion grupat pe lună (Toate lunile) -->
+    <div id="invoicesContainer"></div>
+</div>
+
+<!-- Modal previzualizare mesaj WhatsApp -->
+<div class="modal fade" id="modalWhatsAppPreview" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-whatsapp text-success me-2"></i>Previzualizare mesaj</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <textarea class="form-control" id="whatsAppPreviewText" rows="10" style="font-family: monospace;"></textarea>
+                <p class="small text-muted mt-2 mb-0">Poți edita textul înainte de a-l trimite. Dacă emoticoanele nu apar corect prin „Deschide WhatsApp” (bug cunoscut al aplicației desktop WhatsApp la link-uri), folosește „Copiază mesajul” și lipește-l direct (Ctrl+V) în conversație.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anulează</button>
+                <button type="button" class="btn btn-outline-success" onclick="copiazaMesajWhatsApp()">
+                    <i class="bi bi-clipboard me-1"></i> Copiază mesajul
+                </button>
+                <button type="button" class="btn btn-success" onclick="deschideWhatsAppDinPreview()">
+                    <i class="bi bi-whatsapp me-1"></i> Deschide WhatsApp
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal Adaugă Factură -->
-<div class="modal fade" id="modalAddInvoice" tabindex="-1" aria-hidden="true">
+<!-- Modal marcare plată -->
+<div class="modal fade" id="modalMarcheazaPlata" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-file-earmark-plus me-2 text-primary"></i>Adaugă Factură</h5>
+                <h5 class="modal-title"><i class="bi bi-check-circle me-2 text-success"></i>Marchează factura plătită</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="form-add-invoice" onsubmit="handleInvoiceSubmit(event)">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Număr Factură *</label>
-                        <input type="text" class="form-control" name="nr_factura" required placeholder="Ex: FAC-2026-001">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Data Facturii *</label>
-                        <input type="date" class="form-control" name="data_factura" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Proprietate *</label>
-                        <input type="text" class="form-control" name="proprietate" required placeholder="Nume proprietate">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Descriere *</label>
-                        <textarea class="form-control" name="descriere" rows="2" required placeholder="Descrierea facturii"></textarea>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label small fw-bold">Valoare (RON) *</label>
-                            <input type="number" step="0.01" class="form-control" name="valoare" required placeholder="0.00">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label small fw-bold">Data Scadenței *</label>
-                            <input type="date" class="form-control" name="data_scadenta" required>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Status</label>
-                        <select class="form-select" name="status">
-                            <option value="Plătit">Plătit</option>
-                            <option value="Neplatit">Neplătit</option>
-                            <option value="Partial">Parțial plătit</option>
-                        </select>
-                    </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Link dovadă plată (opțional)</label>
+                    <input type="text" class="form-control" id="fieldLinkDovadaPlata" placeholder="Link Drive către chitanță/confirmare transfer">
+                    <div class="form-text">Urcă documentul în Drive, apoi lipește aici linkul „Share”. Poți lăsa gol dacă vrei doar să marchezi ca plătită.</div>
                 </div>
-                <div class="modal-footer table-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anulează</button>
-                    <button type="submit" class="btn btn-success">Salvează Factură</button>
-                </div>
-            </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anulează</button>
+                <button type="button" class="btn btn-success" onclick="confirmaMarcarePlatita()">
+                    <i class="bi bi-check-lg me-1"></i> Marchează plătită
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
+let invoicesCache = [];
+let activeFilter = null;       // filtru pe proprietate (click pe card) - null = toate
+let activeMonthFilter = "";    // filtru pe lună ("yyyy-mm") - "" = toate lunile (grupat pe accordion)
+let primaIncarcareLuni = true; // la prima încărcare, selectăm automat cea mai recentă lună
+let fileIdPentruPlata = null;  // fileId-ul facturii curent editate în modalul de plată
+
+let driveFolderUrl = "";
+let propertyFolderUrls = {}; // { "Alu": { url, luni: { "Iunie 2026": url, ... } }, ... } - populate din loadInvoices()
+let mesajWhatsAppCurent = "";
+
 (function() {
     loadInvoices();
 })();
 
-function loadInvoices() {
-    const tbody = document.getElementById("invoices-table-body");
-    if (!tbody) return;
+function sarilaSetari(event) {
+    event.preventDefault();
+    const link = document.querySelector('#sidebar-menu a[data-target="Setari"]');
+    if (link) link.click();
+    return false;
+}
 
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="8" class="text-center py-5">
-                <div class="spinner-border text-primary" role="status"></div>
-                <div class="text-muted small mt-2">Se încarcă facturile...</div>
-            </td>
-        </tr>
+function loadInvoices() {
+    const container = document.getElementById("invoicesContainer");
+    container.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <div class="text-muted small mt-2">Se încarcă facturile...</div>
+        </div>
     `;
 
     google.script.run
-        .withSuccessHandler(function(invoices) {
-            renderInvoicesTable(invoices);
-            updateInvoiceKPIs(invoices);
+        .withSuccessHandler(function(data) {
+            invoicesCache = data.invoices || [];
+            driveFolderUrl = data.driveFolderUrl || "";
+            propertyFolderUrls = data.propertyFolderUrls || {};
+            activeFilter = null;
+            populateMonthFilter();
+            renderPropertyTotals();
+            renderInvoicesTable();
         })
         .withFailureHandler(function(err) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="8" class="text-center py-4 text-danger">
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Eroare: ${err.message}
-                    </td>
-                </tr>
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i> Eroare încărcare server: ${err.message}
+                </div>
             `;
         })
-        .apiGetInvoices();
+        .apiGetFacturiPageData();
 }
 
-function renderInvoicesTable(invoices) {
-    const tbody = document.getElementById("invoices-table-body");
-    
-    if (!invoices || invoices.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="8" class="text-center py-4 text-muted">
-                    <i class="bi bi-info-circle me-1"></i> Nu există facturi înregistrate.
-                </td>
-            </tr>
-        `;
+/** Populează dropdown-ul de luni. La prima încărcare, selectează automat cea mai recentă lună. */
+function populateMonthFilter() {
+    const select = document.getElementById("monthFilterSelect");
+    const cheiSet = new Set();
+    invoicesCache.forEach(inv => {
+        const cheie = lunaCheieDinData(inv.dataEmitere);
+        if (cheie) cheiSet.add(cheie);
+    });
+    const chei = Array.from(cheiSet).sort((a, b) => b.localeCompare(a));
+
+    select.innerHTML = `<option value="">Toate lunile (grupat)</option>` +
+        chei.map(c => `<option value="${c}">${lunaEtichetaDinCheie(c)}</option>`).join("");
+
+    if (primaIncarcareLuni && chei.length > 0) {
+        activeMonthFilter = chei[0];
+        primaIncarcareLuni = false;
+    } else if (activeMonthFilter && !chei.includes(activeMonthFilter)) {
+        activeMonthFilter = "";
+    }
+    select.value = activeMonthFilter;
+}
+
+function onMonthFilterChange(valoare) {
+    activeMonthFilter = valoare;
+    renderPropertyTotals();
+    renderInvoicesTable();
+}
+
+/** Returnează facturile filtrate doar pe lună (folosit pentru cardurile de total - toate proprietățile vizibile). */
+function getListaFiltrataLuna() {
+    if (!activeMonthFilter) return invoicesCache;
+    return invoicesCache.filter(inv => lunaCheieDinData(inv.dataEmitere) === activeMonthFilter);
+}
+
+/** Returnează facturile filtrate pe lună ȘI pe proprietatea activă. */
+function getListaFiltrataCompleta() {
+    let lista = getListaFiltrataLuna();
+    if (activeFilter) {
+        lista = lista.filter(inv => (inv.proprietate || "Necunoscuta") === activeFilter);
+    }
+    return lista;
+}
+
+/** Calculează totalul (nr. facturi + sumă) per proprietate (respectând filtrul de lună) și afișează cardurile. */
+function renderPropertyTotals() {
+    const container = document.getElementById("propertyTotals");
+    const listaLuna = getListaFiltrataLuna();
+
+    if (listaLuna.length === 0) {
+        container.innerHTML = `<div class="col-12 text-muted small">Nicio factură pentru luna selectată.</div>`;
         return;
     }
 
+    const grupe = {};
+    listaLuna.forEach(inv => {
+        const prop = inv.proprietate || "Necunoscuta";
+        if (!grupe[prop]) grupe[prop] = { numar: 0, total: 0 };
+        grupe[prop].numar++;
+        grupe[prop].total += Number(inv.suma) || 0;
+    });
+
+    const proprietati = Object.keys(grupe).sort((a, b) => {
+        if (a === "Necunoscuta") return 1;
+        if (b === "Necunoscuta") return -1;
+        return a.localeCompare(b);
+    });
+
     let html = "";
-    invoices.forEach((inv, index) => {
-        const badgeClass = inv.status === "Plătit" ? "bg-success text-white" : (inv.status === "Neplatit" ? "bg-danger text-white" : "bg-warning text-dark");
-        const formattedDate = new Date(inv.data_factura).toLocaleDateString('ro-RO');
-        const formattedDueDate = new Date(inv.data_scadenta).toLocaleDateString('ro-RO');
-        
+
+    const totalGeneral = listaLuna.reduce((s, inv) => s + (Number(inv.suma) || 0), 0);
+    html += `
+        <div class="col-6 col-md-4 col-lg-3">
+            <div class="card h-100 shadow-sm ${activeFilter === null ? 'border-primary border-2' : ''}">
+                <div class="card-body text-center py-3" style="cursor:pointer;" onclick="clearPropertyFilter()">
+                    <div class="small text-muted">Toate</div>
+                    <div class="fw-bold">${listaLuna.length} facturi</div>
+                    <div class="text-primary fw-bold">${totalGeneral.toFixed(2)} RON</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    proprietati.forEach(prop => {
+        const g = grupe[prop];
+        const isActive = activeFilter === prop;
+        html += `
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="card h-100 shadow-sm ${isActive ? 'border-primary border-2' : ''}">
+                    <div class="card-body text-center py-3" style="cursor:pointer;" onclick="filterByProperty('${prop.replace(/'/g, "\\'")}')">
+                        <div class="small text-muted">${prop}</div>
+                        <div class="fw-bold">${g.numar} ${g.numar === 1 ? 'factură' : 'facturi'}</div>
+                        <div class="text-primary fw-bold">${g.total.toFixed(2)} RON</div>
+                    </div>
+                    <div class="card-footer bg-transparent border-0 pt-0 pb-2 text-center">
+                        <button class="btn btn-sm btn-outline-success" onclick="trimiteWhatsApp('${prop.replace(/'/g, "\\'")}')" title="Trimite total pe WhatsApp">
+                            <i class="bi bi-whatsapp"></i> WhatsApp
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function filterByProperty(prop) {
+    activeFilter = prop;
+    renderPropertyTotals();
+    renderInvoicesTable();
+}
+
+function clearPropertyFilter() {
+    activeFilter = null;
+    renderPropertyTotals();
+    renderInvoicesTable();
+}
+
+/** Dispecer: tabel plat dacă e selectată o lună specifică, accordion grupat pe lună dacă e "Toate lunile" (pagină mai scurtă). */
+function renderInvoicesTable() {
+    const filterBar = document.getElementById("filterBar");
+    const filterLabel = document.getElementById("filterLabel");
+
+    if (activeFilter) {
+        filterBar.style.display = "flex";
+        filterLabel.textContent = activeFilter;
+    } else {
+        filterBar.style.display = "none";
+    }
+
+    const listaFiltrata = getListaFiltrataCompleta();
+    const container = document.getElementById("invoicesContainer");
+
+    if (invoicesCache.length === 0) {
+        container.innerHTML = `<div class="alert alert-info"><i class="bi bi-info-circle me-1"></i> Nu există facturi importate încă. Apasă „Import din Drive (OCR)”.</div>`;
+        return;
+    }
+
+    if (listaFiltrata.length === 0) {
+        container.innerHTML = `<div class="alert alert-light border"><i class="bi bi-info-circle me-1"></i> Nicio factură pentru acest filtru.</div>`;
+        return;
+    }
+
+    if (activeMonthFilter) {
+        container.innerHTML = tabelHtml(listaFiltrata, "tbl-luna-unica");
+    } else {
+        container.innerHTML = accordionHtml(listaFiltrata);
+    }
+}
+
+/** Construiește un tabel plat (folosit când e selectată o lună specifică). */
+function tabelHtml(lista, idUnic) {
+    return `
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">${randAntetTabel()}</thead>
+                        <tbody>${randuriTabel(lista)}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/** Construiește un accordion Bootstrap grupat pe lună, cu totalul fiecărei luni în antet. Cea mai recentă lună e deschisă implicit. */
+function accordionHtml(lista) {
+    const grupe = {};
+    lista.forEach(inv => {
+        const cheie = lunaCheieDinData(inv.dataEmitere) || "Nedeterminat";
+        if (!grupe[cheie]) grupe[cheie] = [];
+        grupe[cheie].push(inv);
+    });
+
+    const chei = Object.keys(grupe).sort((a, b) => {
+        if (a === "Nedeterminat") return 1;
+        if (b === "Nedeterminat") return -1;
+        return b.localeCompare(a);
+    });
+
+    let html = `<div class="accordion" id="accordionLuni">`;
+    chei.forEach((cheie, idx) => {
+        const facturiLuna = grupe[cheie];
+        const eticheta = cheie === "Nedeterminat" ? "Dată nedeterminată" : lunaEtichetaDinCheie(cheie);
+        const totalLuna = facturiLuna.reduce((s, inv) => s + (Number(inv.suma) || 0), 0);
+        const idCollapse = "collapse-" + idx;
+        const deschis = idx === 0;
+
+        html += `
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button ${deschis ? '' : 'collapsed'}" type="button" data-bs-toggle="collapse" data-bs-target="#${idCollapse}">
+                        <span class="fw-bold me-2">${eticheta}</span>
+                        <span class="text-muted small me-auto">${facturiLuna.length} ${facturiLuna.length === 1 ? 'factură' : 'facturi'}</span>
+                        <span class="badge text-bg-primary me-3">${totalLuna.toFixed(2)} RON</span>
+                    </button>
+                </h2>
+                <div id="${idCollapse}" class="accordion-collapse collapse ${deschis ? 'show' : ''}" data-bs-parent="#accordionLuni">
+                    <div class="accordion-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">${randAntetTabel()}</thead>
+                                <tbody>${randuriTabel(facturiLuna)}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += `</div>`;
+    return html;
+}
+
+function randAntetTabel() {
+    return `
+        <tr>
+            <th class="ps-4">Proprietate</th>
+            <th>Furnizor</th>
+            <th>Cod Client</th>
+            <th>Nr. Factură</th>
+            <th>Scadență</th>
+            <th class="text-end">Sumă</th>
+            <th>Status</th>
+            <th>Plată</th>
+            <th class="pe-4">Document</th>
+        </tr>
+    `;
+}
+
+function randuriTabel(lista) {
+    let html = "";
+    lista.forEach(inv => {
+        const statusLower = (inv.status || "").toLowerCase();
+        let badgeClass = "bg-info-subtle text-dark";
+        if (statusLower.indexOf("de verificat") !== -1) {
+            badgeClass = "bg-warning text-dark";
+        } else if (statusLower.indexOf("verificat") !== -1 || statusLower.indexOf("platit") !== -1) {
+            badgeClass = "bg-success text-white";
+        }
+        const suma = inv.suma ? Number(inv.suma).toFixed(2) + " " + inv.moneda : "-";
+        const emojiFurnizor = (typeof EMOJI_FURNIZOR !== "undefined" && EMOJI_FURNIZOR[inv.furnizor]) || "";
+
+        const platita = inv.statusPlata === "Platita";
+        let coloanaPlata;
+        if (platita) {
+            const linkChitanta = inv.linkDovadaPlata
+                ? `<a href="${inv.linkDovadaPlata}" target="_blank" class="badge bg-success text-white text-decoration-none" title="Vezi dovada plății"><i class="bi bi-check-circle me-1"></i>Plătită</a>`
+                : `<span class="badge bg-success text-white"><i class="bi bi-check-circle me-1"></i>Plătită</span>`;
+            coloanaPlata = `${linkChitanta} <button class="btn btn-sm btn-link text-muted p-0 ms-1" onclick="anuleazaPlata('${inv.fileId}')" title="Anulează marcajul de plată"><i class="bi bi-arrow-counterclockwise"></i></button>`;
+        } else {
+            coloanaPlata = `<button class="btn btn-sm btn-outline-success" onclick="deschideModalPlata('${inv.fileId}')"><i class="bi bi-check-lg"></i> Marchează</button>`;
+        }
+
         html += `
             <tr>
-                <td class="ps-4 fw-bold">${inv.nr_factura}</td>
-                <td>${formattedDate}</td>
-                <td>${inv.proprietate}</td>
-                <td><small>${inv.descriere}</small></td>
-                <td>${parseFloat(inv.valoare).toFixed(2)} RON</td>
-                <td>${formattedDueDate}</td>
+                <td class="ps-4 fw-bold">${inv.proprietate}</td>
+                <td>${emojiFurnizor} ${inv.furnizor}</td>
+                <td class="text-muted small">${inv.codClient || "-"}</td>
+                <td>${inv.numarFactura}</td>
+                <td>${inv.dataScadenta}</td>
+                <td class="fw-bold text-end">${suma}</td>
                 <td><span class="badge ${badgeClass}">${inv.status}</span></td>
+                <td>${coloanaPlata}</td>
                 <td class="pe-4">
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteInvoice(${index})">
-                        <i class="bi bi-trash"></i>
-                    </button>
+                    <a href="${inv.linkDrive}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-file-earmark-text"></i>
+                    </a>
                 </td>
             </tr>
         `;
     });
-    tbody.innerHTML = html;
+    return html;
 }
 
-function updateInvoiceKPIs(invoices) {
-    let totalValue = 0;
-    let paidValue = 0;
-    let unpaidValue = 0;
+// ============================================
+// Marcare plată
+// ============================================
 
-    invoices.forEach(inv => {
-        const value = parseFloat(inv.valoare) || 0;
-        totalValue += value;
-        
-        if (inv.status === "Plătit") {
-            paidValue += value;
-        } else if (inv.status === "Neplatit") {
-            unpaidValue += value;
-        } else {
-            unpaidValue += value * 0.5; // Parțial plătit
-        }
-    });
-
-    document.getElementById("total-invoices").textContent = totalValue.toFixed(2) + " RON";
-    document.getElementById("count-invoices").textContent = invoices.length;
-    document.getElementById("paid-invoices").textContent = paidValue.toFixed(2) + " RON";
-    document.getElementById("unpaid-invoices").textContent = unpaidValue.toFixed(2) + " RON";
+function deschideModalPlata(fileId) {
+    fileIdPentruPlata = fileId;
+    document.getElementById("fieldLinkDovadaPlata").value = "";
+    const modalEl = document.getElementById('modalMarcheazaPlata');
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
 }
 
-function handleInvoiceSubmit(event) {
-    event.preventDefault();
-    
-    const form = event.target;
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalBtnText = submitBtn.innerHTML;
-    
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Se salvează...`;
+function confirmaMarcarePlatita() {
+    const link = document.getElementById("fieldLinkDovadaPlata").value.trim();
 
-    const formData = new FormData(form);
-    const invoiceObject = {
-        nr_factura: formData.get("nr_factura"),
-        data_factura: formData.get("data_factura"),
-        proprietate: formData.get("proprietate"),
-        descriere: formData.get("descriere"),
-        valoare: formData.get("valoare"),
-        data_scadenta: formData.get("data_scadenta"),
-        status: formData.get("status")
-    };
-
-    google.script.run
-        .withSuccessHandler(function(response) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalBtnText;
-
-            if (response && response.success) {
-                const modalEl = document.getElementById('modalAddInvoice');
-                const modalBtnClose = modalEl.querySelector('.btn-close');
-                if (modalBtnClose) modalBtnClose.click();
-                
-                form.reset();
-                loadInvoices();
-            } else {
-                alert("Eroare la salvare.");
-            }
-        })
-        .withFailureHandler(function(err) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalBtnText;
-            alert("Eroare de comunicare: " + err.message);
-        })
-        .apiSaveInvoice(invoiceObject);
-}
-
-function deleteInvoice(index) {
-    if (!confirm("Ești sigur că vrei să ștergi această factură?")) return;
-    
     google.script.run
         .withSuccessHandler(function() {
+            const modalEl = document.getElementById('modalMarcheazaPlata');
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
             loadInvoices();
         })
         .withFailureHandler(function(err) {
-            alert("Eroare la ștergere: " + err.message);
+            alert("Eroare: " + err.message);
         })
-        .apiDeleteInvoice(index);
+        .apiMarcheazaFacturaPlatita(fileIdPentruPlata, link);
+}
+
+function anuleazaPlata(fileId) {
+    if (!confirm("Anulezi marcajul de plată pentru această factură?")) return;
+
+    google.script.run
+        .withSuccessHandler(function() { loadInvoices(); })
+        .withFailureHandler(function(err) { alert("Eroare: " + err.message); })
+        .apiAnuleazaPlataFactura(fileId);
+}
+
+// ============================================
+// WhatsApp - emoticoanele sunt scrise ca escape-uri \u{...} (text ASCII pur), NU ca
+// literale UTF-8 - literalele s-au corupt anterior la trecerea prin Windows/VS Code/clasp.
+// ============================================
+const EMOJI_FURNIZOR = {
+    "Hidroelectrica": "\u26A1",        // fulger
+    "ENGIE": "\uD83D\uDD25",           // flacără
+    "Apa Brasov": "\uD83D\uDCA7",      // picătură
+    "Comprest": "\uD83D\uDDD1\uFE0F",  // coș de gunoi
+    "Digi": "\uD83D\uDCF6"             // semnal
+};
+const EMOJI_FALLBACK = "\uD83E\uDDFE";   // chitanță
+const EMOJI_CLIPBOARD = "\uD83D\uDCCB";  // clipboard
+const EMOJI_FOLDER = "\uD83D\uDCC1";     // folder
+
+function trimiteWhatsApp(proprietate) {
+    const lista = getListaFiltrataLuna().filter(inv => (inv.proprietate || "Necunoscuta") === proprietate);
+
+    if (lista.length === 0) {
+        alert("Nu există facturi pentru " + proprietate + " în perioada selectată.");
+        return;
+    }
+
+    const peFurnizor = {};
+    lista.forEach(inv => {
+        const f = inv.furnizor || "Altele";
+        peFurnizor[f] = (peFurnizor[f] || 0) + (Number(inv.suma) || 0);
+    });
+
+    const total = lista.reduce((s, inv) => s + (Number(inv.suma) || 0), 0);
+    const perioadaLabel = activeMonthFilter ? lunaEtichetaDinCheie(activeMonthFilter) : "toate lunile";
+
+    let mesaj = `${EMOJI_CLIPBOARD} Facturi utilități *${proprietate}* - ${perioadaLabel}\n\n`;
+    Object.keys(peFurnizor).forEach(f => {
+        const emoji = EMOJI_FURNIZOR[f] || EMOJI_FALLBACK;
+        mesaj += `${emoji} ${f}: ${peFurnizor[f].toFixed(2)} RON\n`;
+    });
+    mesaj += `\nTotal: *${total.toFixed(2)} RON*\n`;
+
+    let linkSpecific = driveFolderUrl;
+    const propInfo = propertyFolderUrls[proprietate];
+    if (propInfo) {
+        linkSpecific = propInfo.url;
+        if (activeMonthFilter) {
+            const etichetaLuna = lunaEtichetaDinCheie(activeMonthFilter);
+            if (propInfo.luni && propInfo.luni[etichetaLuna]) {
+                linkSpecific = propInfo.luni[etichetaLuna];
+            }
+        }
+    }
+    if (linkSpecific) {
+        mesaj += `\n${EMOJI_FOLDER} Facturile ${proprietate}: ${linkSpecific}`;
+    }
+
+    mesajWhatsAppCurent = mesaj;
+    document.getElementById("whatsAppPreviewText").value = mesaj;
+    const modalEl = document.getElementById('modalWhatsAppPreview');
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+function copiazaMesajWhatsApp() {
+    const textarea = document.getElementById("whatsAppPreviewText");
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, 99999);
+
+    function confirmaCopiere() {
+        alert("Mesaj copiat! Deschide conversația din WhatsApp și lipește (Ctrl+V).");
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textarea.value).then(confirmaCopiere).catch(function() {
+            document.execCommand("copy");
+            confirmaCopiere();
+        });
+    } else {
+        document.execCommand("copy");
+        confirmaCopiere();
+    }
+}
+
+function deschideWhatsAppDinPreview() {
+    const text = document.getElementById("whatsAppPreviewText").value;
+    const url = "https://wa.me/?text=" + encodeURIComponent(text);
+    window.open(url, "_blank");
+
+    const modalEl = document.getElementById('modalWhatsAppPreview');
+    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+}
+
+function setupDriveFoldersUI(btnEl) {
+    const btn = btnEl;
+    const summaryDiv = document.getElementById("importSummary");
+    const originalHtml = btn.innerHTML;
+
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Se creează folderele...`;
+    summaryDiv.innerHTML = "";
+
+    google.script.run
+        .withSuccessHandler(function(result) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+
+            summaryDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <strong>Foldere create/verificate în Drive:</strong> ${result.subfolders.join(", ")}<br>
+                    <a href="${result.url}" target="_blank">${result.url}</a><br>
+                    <span class="small text-muted">ID folder rădăcină: ${result.id}</span>
+                </div>
+            `;
+        })
+        .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            summaryDiv.innerHTML = `<div class="alert alert-danger"><strong>Eroare:</strong> ${err.message}</div>`;
+        })
+        .apiSetupDriveFolders();
+}
+
+function importFromDrive() {
+    const btn = document.getElementById("btnImportDrive");
+    const summaryDiv = document.getElementById("importSummary");
+    const originalHtml = btn.innerHTML;
+
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Se scanează Drive și se face OCR...`;
+    summaryDiv.innerHTML = "";
+
+    google.script.run
+        .withSuccessHandler(function(summary) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+
+            summaryDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <strong>Import finalizat:</strong>
+                    ${summary.importate} facturi noi importate,
+                    ${summary.sarite} deja existente (sărite),
+                    ${summary.esuate} eșuate.
+                    ${summary.deVerificat > 0 ? `<br><strong class="text-warning">${summary.deVerificat} facturi cu proprietate nedeterminată</strong> — verifică-le manual în tabel (status „DE VERIFICAT").` : ""}
+                    ${summary.ramase > 0 ? `<br><strong>Mai sunt ${summary.ramase} facturi de procesat</strong> (se importă câte puține pe rând, ca să nu lovim limita Google pentru OCR) — apasă din nou „Import din Drive (OCR)” ca să continui.` : ""}
+                </div>
+            `;
+            loadInvoices();
+        })
+        .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            summaryDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>Eroare la import:</strong> ${err.message}
+                </div>
+            `;
+        })
+        .apiImportInvoicesFromDrive();
 }
 </script>

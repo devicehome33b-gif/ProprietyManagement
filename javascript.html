@@ -6,4 +6,36 @@ document.addEventListener("DOMContentLoaded", function(){
 
 });
 
+// ============================================
+// Helpere globale (folosite de Facturi, Rapoarte)
+// ============================================
+
+const LUNI_RO = ["Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
+                 "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"];
+
+/** Parsează o dată în format "dd.mm.yyyy" (sau dd/mm/yyyy) -> {zi, luna (0-indexat), an} sau null. */
+function parseDataRO(dateStr) {
+    if (!dateStr || dateStr === "-") return null;
+    const match = String(dateStr).match(/(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})/);
+    if (!match) return null;
+    return {
+        zi: parseInt(match[1], 10),
+        luna: parseInt(match[2], 10) - 1,
+        an: parseInt(match[3], 10)
+    };
+}
+
+/** Cheie sortabilă "yyyy-mm" din format "dd.mm.yyyy". Returnează null dacă data nu e validă. */
+function lunaCheieDinData(dateStr) {
+    const d = parseDataRO(dateStr);
+    if (!d) return null;
+    return d.an + "-" + String(d.luna + 1).padStart(2, "0");
+}
+
+/** Etichetă lizibilă "Iunie 2026" din cheia "2026-06". */
+function lunaEtichetaDinCheie(cheie) {
+    const [an, luna] = cheie.split("-");
+    return LUNI_RO[parseInt(luna, 10) - 1] + " " + an;
+}
+
 </script>

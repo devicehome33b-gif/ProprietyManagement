@@ -1,0 +1,210 @@
+<div class="container-fluid p-4">
+    <div class="mb-4">
+        <h2 class="mb-1"><i class="bi bi-gear me-2"></i>Setări</h2>
+        <p class="text-muted small mb-0">Unde pui facturile noi și acțiuni de întreținere a datelor.</p>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-cloud-upload me-2 text-primary"></i>Unde pun facturile noi?</h5>
+            <p class="mb-2">
+                Pune fișierele PDF sau imagine (poze de factură) <strong>direct în folderul Drive de mai jos</strong>,
+                fără să le sortezi manual — sistemul detectează automat proprietatea (după cod de client/contract sau
+                adresă) și le mută singur în subfolderul corect (<code>Proprietate / Lună An</code>) la următorul import.
+            </p>
+            <div id="driveFolderInfo" class="text-muted small">Se încarcă...</div>
+            <p class="small text-muted mt-2 mb-0">
+                Apoi mergi pe pagina <strong>Facturi</strong> și apasă <strong>„Import din Drive (OCR)”</strong>.
+            </p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-bar-chart-line me-2 text-primary"></i>Stare curentă</h5>
+            <div id="statsInfo" class="text-muted small">Se încarcă...</div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-tools me-2 text-primary"></i>Întreținere</h5>
+            <p class="small text-muted">
+                Acțiuni utile după modificări de calibrare (ex: reguli noi de extragere a sumei) sau dacă observi
+                date ciudate în Proprietăți/Facturi. Sigure de rulat de mai multe ori.
+            </p>
+
+            <div class="list-group">
+                <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="fw-bold">Recalculează sumele facturilor</div>
+                        <div class="small text-muted">Refolosește textul OCR deja salvat, cu regulile curente de extragere — util după orice ajustare a parsării sumei.</div>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" onclick="ruleazaActiune('apiRepararSumeToateFacturile', 'result-suma', this)">Rulează</button>
+                </div>
+                <div id="result-suma" class="small mt-1 mb-2"></div>
+
+                <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="fw-bold">Mută facturile în subfoldere Proprietate / Lună</div>
+                        <div class="small text-muted">Reorganizează în Drive facturile deja importate, pe baza proprietății și lunii salvate în tabel.</div>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" onclick="ruleazaActiune('apiMigreazaFacturileInSubfoldere', 'result-migrare', this)">Rulează</button>
+                </div>
+                <div id="result-migrare" class="small mt-1 mb-2"></div>
+
+                <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="fw-bold">Repară date corupte</div>
+                        <div class="small text-muted">Google Sheets poate transforma automat text ca „1Dec” în dată calendaristică. Detectează și repară astfel de cazuri.</div>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" onclick="ruleazaActiune('apiRepararDateCorupte', 'result-date', this)">Rulează</button>
+                </div>
+                <div id="result-date" class="small mt-1 mb-2"></div>
+
+                <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="fw-bold">Creează foldere în Drive</div>
+                        <div class="small text-muted">Creează folderul rădăcină + subfoldere per proprietate, dacă nu există deja.</div>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" onclick="ruleazaActiune('apiSetupDriveFolders', 'result-foldere', this)">Rulează</button>
+                </div>
+                <div id="result-foldere" class="small mt-1 mb-2"></div>
+
+                <div class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <div class="fw-bold">Elimină facturile duplicate</div>
+                        <div class="small text-muted">Caută facturi intrate de două ori (ex: aceeași factură importată și prin OCR, și prin API-ul furnizorului). Îți arată întâi ce a găsit — nu șterge nimic fără confirmarea ta.</div>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" id="btnPreviewDuplicate" onclick="previzualizeazaDuplicate()">Caută duplicate</button>
+                </div>
+                <div id="result-duplicate" class="mt-2 mb-2"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function previzualizeazaDuplicate() {
+    const btn = document.getElementById("btnPreviewDuplicate");
+    const resultDiv = document.getElementById("result-duplicate");
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+    resultDiv.innerHTML = "";
+
+    google.script.run
+        .withSuccessHandler(function(rezultat) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            afiseazaDuplicate(rezultat.grupuri || []);
+        })
+        .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            resultDiv.innerHTML = `<span class="text-danger">Eroare: ${err.message}</span>`;
+        })
+        .apiPrevizualizeazaFacturiDuplicate();
+}
+
+function afiseazaDuplicate(grupuri) {
+    const resultDiv = document.getElementById("result-duplicate");
+
+    if (grupuri.length === 0) {
+        resultDiv.innerHTML = `<div class="alert alert-success mb-0"><i class="bi bi-check-circle me-1"></i>Nicio factură duplicată găsită.</div>`;
+        return;
+    }
+
+    let html = `<div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+        ${grupuri.length} ${grupuri.length === 1 ? 'grup de facturi posibil duplicate' : 'grupuri de facturi posibil duplicate'}.
+        Bifează rândurile pe care vrei să le ȘTERGI (rândul recomandat de păstrat e debifat implicit) și apasă „Șterge rândurile bifate”.
+    </div>`;
+
+    grupuri.forEach((grup, gIdx) => {
+        html += `<div class="card mb-2"><div class="card-body py-2">
+            <div class="small fw-bold mb-1">${grup[0].furnizor} - Factura ${grup[0].numarFactura}</div>
+            <table class="table table-sm mb-0">
+                <thead><tr><th></th><th>Proprietate</th><th>Sumă</th><th>Dată emitere</th><th>Status</th><th>Document</th></tr></thead>
+                <tbody>`;
+        grup.forEach((intrare) => {
+            const bifatImplicit = !intrare.recomandarePastrare;
+            html += `<tr class="${intrare.recomandarePastrare ? 'table-success' : ''}">
+                <td><input type="checkbox" class="form-check-input duplicate-checkbox" data-row="${intrare.rowIndex}" ${bifatImplicit ? 'checked' : ''}></td>
+                <td>${intrare.proprietate}</td>
+                <td>${intrare.suma} RON</td>
+                <td>${intrare.dataEmitere}</td>
+                <td class="small">${intrare.status}${intrare.recomandarePastrare ? ' <span class="badge bg-success">recomandat păstrat</span>' : ''}</td>
+                <td>${intrare.linkDrive ? `<a href="${intrare.linkDrive}" target="_blank"><i class="bi bi-file-earmark-text"></i></a>` : '-'}</td>
+            </tr>`;
+        });
+        html += `</tbody></table></div></div>`;
+    });
+
+    html += `<button class="btn btn-danger" onclick="stergeRanduriConfirmate()">
+        <i class="bi bi-trash me-1"></i> Șterge rândurile bifate
+    </button>`;
+
+    resultDiv.innerHTML = html;
+}
+
+function stergeRanduriConfirmate() {
+    const bifate = Array.from(document.querySelectorAll(".duplicate-checkbox:checked"))
+        .map(cb => parseInt(cb.dataset.row, 10));
+
+    if (bifate.length === 0) {
+        alert("Nu ai bifat niciun rând de șters.");
+        return;
+    }
+
+    if (!confirm(`Sigur ștergi ${bifate.length} ${bifate.length === 1 ? 'rând' : 'rânduri'}? Acțiunea nu poate fi anulată din aplicație (dar poți recupera din File → Version history din Google Sheets).`)) {
+        return;
+    }
+
+    google.script.run
+        .withSuccessHandler(function(rezultat) {
+            document.getElementById("result-duplicate").innerHTML =
+                `<div class="alert alert-success mb-0"><i class="bi bi-check-circle me-1"></i>${rezultat.sterse} rânduri șterse.</div>`;
+        })
+        .withFailureHandler(function(err) {
+            document.getElementById("result-duplicate").innerHTML = `<div class="alert alert-danger mb-0">Eroare: ${err.message}</div>`;
+        })
+        .apiStergeRanduriFacturi(bifate);
+}
+
+(function() {
+    google.script.run
+        .withSuccessHandler(function(info) {
+            document.getElementById("driveFolderInfo").innerHTML =
+                `<a href="${info.driveFolderUrl}" target="_blank">${info.driveFolderUrl}</a>`;
+            document.getElementById("statsInfo").innerHTML =
+                `${info.numarProprietati} proprietăți înregistrate - ${info.numarFacturi} facturi importate.`;
+        })
+        .withFailureHandler(function(err) {
+            document.getElementById("driveFolderInfo").innerHTML = `<span class="text-danger">Eroare: ${err.message}</span>`;
+        })
+        .apiGetSetariInfo();
+})();
+
+/** Rulează o funcție API de întreținere și afișează rezultatul brut sub buton. */
+function ruleazaActiune(numeFunctieApi, idRezultat, btn) {
+    const resultDiv = document.getElementById(idRezultat);
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+    resultDiv.innerHTML = "";
+
+    google.script.run
+        .withSuccessHandler(function(rezultat) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            resultDiv.innerHTML = `<span class="text-success"><i class="bi bi-check-circle me-1"></i>${JSON.stringify(rezultat)}</span>`;
+        })
+        .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            resultDiv.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>Eroare: ${err.message}</span>`;
+        })
+        [numeFunctieApi]();
+}
+</script>

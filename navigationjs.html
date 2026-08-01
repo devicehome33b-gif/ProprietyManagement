@@ -5,6 +5,13 @@ document.addEventListener("DOMContentLoaded", function() {
     const loader = document.getElementById("loader");
     const topbarTitle = document.querySelector("#topbar h4");
 
+    // Cache client-side pentru șablonul HTML+JS al fiecărui modul, per sesiune de browser.
+    // Șablonul (structura paginii, butoane, tabele goale) nu se schimbă niciodată la runtime -
+    // doar DATELE se schimbă, iar acelea sunt oricum re-preluate de fiecare dată de scriptul
+    // propriu al modulului (ex: loadInvoices()), indiferent dacă șablonul vine din cache sau
+    // de la server. Cache-ul elimină doar un apel de rețea inutil, repetat la fiecare navigare.
+    const moduleCache = {};
+
     menuItems.forEach(item => {
         item.addEventListener("click", function(e) {
             e.preventDefault();
@@ -27,19 +34,16 @@ document.addEventListener("DOMContentLoaded", function() {
     function loadModule(moduleName) {
         if (loader) loader.classList.remove("d-none");
 
+        if (moduleCache[moduleName]) {
+            inserezaSiExecutaModul(moduleCache[moduleName]);
+            if (loader) loader.classList.add("d-none");
+            return;
+        }
+
         google.script.run
             .withSuccessHandler(function(htmlContent) {
-                appContent.innerHTML = htmlContent;
-                
-                // Execută scripturile din interiorul modulului încărcat
-                const scripts = appContent.querySelectorAll("script");
-                scripts.forEach(oldScript => {
-                    const newScript = document.createElement("script");
-                    Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
-                    newScript.appendChild(document.createTextNode(oldScript.innerHTML));
-                    oldScript.parentNode.replaceChild(newScript, oldScript);
-                });
-
+                moduleCache[moduleName] = htmlContent;
+                inserezaSiExecutaModul(htmlContent);
                 if (loader) loader.classList.add("d-none");
             })
             .withFailureHandler(function(err) {
@@ -47,6 +51,20 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (loader) loader.classList.add("d-none");
             })
             .apiGetModuleHtml(moduleName); // Execută ruta din api.gs
+    }
+
+    function inserezaSiExecutaModul(htmlContent) {
+        appContent.innerHTML = htmlContent;
+
+        // Execută scripturile din interiorul modulului încărcat (innerHTML nu le rulează
+        // automat din motive de securitate ale browserului, trebuie recreate manual).
+        const scripts = appContent.querySelectorAll("script");
+        scripts.forEach(oldScript => {
+            const newScript = document.createElement("script");
+            Array.from(oldScript.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value));
+            newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+            oldScript.parentNode.replaceChild(newScript, oldScript);
+        });
     }
 });
 </script>

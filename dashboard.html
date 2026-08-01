@@ -1,84 +1,185 @@
 <div class="container-fluid">
 
     <div class="row mb-4">
-
         <div class="col">
-
-            <h2>
-                <i class="bi bi-speedometer2"></i>
-                Dashboard
-            </h2>
-
-            <p class="text-muted">
-                Bine ai venit în Property Manager.
-            </p>
-
+            <h2><i class="bi bi-speedometer2"></i> Dashboard</h2>
+            <p class="text-muted">Privire de ansamblu asupra proprietăților și cheltuielilor.</p>
         </div>
-
     </div>
+
+    <div id="alertRestante" style="display:none;"></div>
 
     <div class="cards">
-
         <div class="kpi-card">
-
-            <div class="kpi-title">
-                Proprietăți
+            <div class="kpi-icon-circle kpi-icon-blue"><i class="bi bi-house-door"></i></div>
+            <div>
+                <div class="kpi-title">Proprietăți</div>
+                <div class="kpi-value" id="kpi-proprietati">-</div>
             </div>
-
-            <div class="kpi-value">
-                0
-            </div>
-
         </div>
-
         <div class="kpi-card">
-
-            <div class="kpi-title">
-                Chiriași
+            <div class="kpi-icon-circle kpi-icon-green"><i class="bi bi-receipt"></i></div>
+            <div>
+                <div class="kpi-title">Facturi</div>
+                <div class="kpi-value" id="kpi-facturi">-</div>
             </div>
-
-            <div class="kpi-value">
-                0
-            </div>
-
         </div>
-
         <div class="kpi-card">
-
-            <div class="kpi-title">
-                Facturi
+            <div class="kpi-icon-circle kpi-icon-orange"><i class="bi bi-cash-stack"></i></div>
+            <div>
+                <div class="kpi-title">Total cheltuieli</div>
+                <div class="kpi-value" id="kpi-utilitati" style="font-size:24px;">-</div>
             </div>
-
-            <div class="kpi-value">
-                0
-            </div>
-
         </div>
-
-        <div class="kpi-card">
-
-            <div class="kpi-title">
-                Utilități
+        <div class="kpi-card" id="kpi-card-scadente" style="cursor:pointer;">
+            <div class="kpi-icon-circle kpi-icon-red"><i class="bi bi-alarm"></i></div>
+            <div>
+                <div class="kpi-title">Scadențe (14 zile)</div>
+                <div class="kpi-value" id="kpi-scadente">-</div>
             </div>
-
-            <div class="kpi-value">
-                0 RON
-            </div>
-
         </div>
-
     </div>
 
-    <div class="panel">
-
-        <div class="panel-title">
-
-            Cheltuieli lunare
-
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <div class="panel h-100">
+                <div class="panel-title"><i class="bi bi-bar-chart me-2"></i>Cheltuieli pe proprietate</div>
+                <canvas id="chartUtilities" height="180"></canvas>
+                <div id="chartEmptyMsg" class="text-muted text-center py-4" style="display:none;">
+                    Nicio factură importată încă.
+                </div>
+            </div>
         </div>
-
-        <canvas id="chartUtilities" height="120"></canvas>
-
+        <div class="col-lg-5">
+            <div class="panel h-100">
+                <div class="panel-title"><i class="bi bi-clock-history me-2"></i>Scadențe apropiate</div>
+                <div id="listaScadente"></div>
+            </div>
+        </div>
     </div>
 
 </div>
+
+<script>
+let chartInstance = null;
+
+(function() {
+    google.script.run
+        .withSuccessHandler(function(data) {
+            document.getElementById("kpi-proprietati").textContent = data.totalProprietati;
+            document.getElementById("kpi-facturi").textContent = data.totalFacturi;
+            document.getElementById("kpi-utilitati").textContent = data.totalUtilitati.toFixed(2) + " RON";
+            renderChart(data.invoices || []);
+            renderScadente(data.invoices || []);
+        })
+        .withFailureHandler(function(err) {
+            console.error("Eroare la încărcarea dashboard-ului: " + err.message);
+        })
+        .apiGetDashboardData();
+})();
+
+function renderChart(invoices) {
+    const canvas = document.getElementById("chartUtilities");
+    const emptyMsg = document.getElementById("chartEmptyMsg");
+
+    if (invoices.length === 0) {
+        canvas.style.display = "none";
+        emptyMsg.style.display = "block";
+        return;
+    }
+
+    const grupe = {};
+    invoices.forEach(inv => {
+        const prop = inv.proprietate || "Necunoscuta";
+        grupe[prop] = (grupe[prop] || 0) + (Number(inv.suma) || 0);
+    });
+
+    const proprietati = Object.keys(grupe).sort((a, b) => grupe[b] - grupe[a]);
+    const valori = proprietati.map(p => grupe[p]);
+    const culori = ["#4361ee", "#2a9d8f", "#f77f00", "#e63946", "#7209b7", "#4cc9f0"];
+
+    if (chartInstance) chartInstance.destroy();
+
+    chartInstance = new Chart(canvas.getContext("2d"), {
+        type: "bar",
+        data: {
+            labels: proprietati,
+            datasets: [{
+                label: "Total cheltuieli (RON)",
+                data: valori,
+                backgroundColor: proprietati.map((_, i) => culori[i % culori.length]),
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+function renderScadente(invoices) {
+    const container = document.getElementById("listaScadente");
+    const alertDiv = document.getElementById("alertRestante");
+    const astazi = new Date();
+    astazi.setHours(0, 0, 0, 0);
+
+    const cuScadenta = invoices.map(inv => {
+        const d = parseDataRO(inv.dataScadenta);
+        if (!d) return null;
+        const dataScadenta = new Date(d.an, d.luna, d.zi);
+        const zileRamase = Math.round((dataScadenta - astazi) / 86400000);
+        return { inv: inv, dataScadenta: dataScadenta, zileRamase: zileRamase };
+    }).filter(x => x !== null && x.zileRamase <= 14);
+
+    cuScadenta.sort((a, b) => a.dataScadenta - b.dataScadenta);
+
+    // KPI-ul include TOT ce necesită atenție acum: restante (zile negative) + apropiate (0-14 zile)
+    document.getElementById("kpi-scadente").textContent = cuScadenta.length;
+
+    const restante = cuScadenta.filter(x => x.zileRamase < 0);
+    if (restante.length > 0) {
+        const totalRestant = restante.reduce((s, x) => s + (Number(x.inv.suma) || 0), 0);
+        alertDiv.style.display = "block";
+        alertDiv.innerHTML = `
+            <div class="alert alert-danger d-flex align-items-center mb-4">
+                <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+                <div>
+                    <strong>${restante.length} ${restante.length === 1 ? 'factură restantă' : 'facturi restante'}</strong>
+                    — total ${totalRestant.toFixed(2)} RON neachitate la scadență.
+                </div>
+            </div>
+        `;
+    } else {
+        alertDiv.style.display = "none";
+    }
+
+    if (cuScadenta.length === 0) {
+        container.innerHTML = `<p class="text-muted small mb-0">Nicio factură cu scadență apropiată.</p>`;
+        return;
+    }
+
+    let html = `<div class="list-group list-group-flush">`;
+    cuScadenta.slice(0, 8).forEach(x => {
+        const inv = x.inv;
+        let badgeClass = "text-bg-secondary";
+        let eticheta = x.zileRamase + " zile";
+        if (x.zileRamase < 0) { badgeClass = "text-bg-danger"; eticheta = "Restantă " + Math.abs(x.zileRamase) + " zile"; }
+        else if (x.zileRamase === 0) { badgeClass = "text-bg-danger"; eticheta = "Astăzi"; }
+        else if (x.zileRamase <= 3) { badgeClass = "text-bg-warning"; eticheta = x.zileRamase + " zile"; }
+
+        html += `
+            <a href="${inv.linkDrive}" target="_blank" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
+                <div>
+                    <div class="fw-bold">${inv.proprietate} <span class="text-muted fw-normal">- ${inv.furnizor}</span></div>
+                    <div class="small text-muted">${inv.suma ? Number(inv.suma).toFixed(2) + " RON" : "-"} · scadență ${inv.dataScadenta}</div>
+                </div>
+                <span class="badge ${badgeClass} rounded-pill">${eticheta}</span>
+            </a>
+        `;
+    });
+    html += `</div>`;
+    container.innerHTML = html;
+}
+</script>

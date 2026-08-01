@@ -1,0 +1,141 @@
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1"><i class="bi bi-graph-up me-2"></i>Rapoarte</h2>
+            <p class="text-muted small mb-0">Cheltuieli lunare cu utilitățile, pe fiecare proprietate.</p>
+        </div>
+        <button class="btn btn-outline-primary" onclick="loadReport()">
+            <i class="bi bi-arrow-clockwise me-1"></i> Actualizare
+        </button>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="reportTable">
+                    <thead class="table-light">
+                        <tr id="reportHeaderRow">
+                            <th class="ps-4">Lună</th>
+                        </tr>
+                    </thead>
+                    <tbody id="report-table-body">
+                        <tr>
+                            <td colspan="10" class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <div class="text-muted small mt-2">Se calculează raportul...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    loadReport();
+})();
+
+function loadReport() {
+    const tbody = document.getElementById("report-table-body");
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="10" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="text-muted small mt-2">Se calculează raportul...</div>
+            </td>
+        </tr>
+    `;
+
+    google.script.run
+        .withSuccessHandler(function(invoices) {
+            renderReport(invoices || []);
+        })
+        .withFailureHandler(function(err) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="10" class="text-center py-4 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Eroare încărcare server: ${err.message}
+                    </td>
+                </tr>
+            `;
+        })
+        .apiGetInvoices();
+}
+
+function renderReport(invoices) {
+    const tbody = document.getElementById("report-table-body");
+    const headerRow = document.getElementById("reportHeaderRow");
+
+    if (invoices.length === 0) {
+        headerRow.innerHTML = `<th class="ps-4">Lună</th>`;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="10" class="text-center py-4 text-muted">
+                    <i class="bi bi-info-circle me-1"></i> Nu există facturi importate încă.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    // Proprietăți distincte (coloane), sortate alfabetic, cu "Necunoscuta" la final
+    const proprietatiSet = new Set(invoices.map(inv => inv.proprietate || "Necunoscuta"));
+    const proprietati = Array.from(proprietatiSet).sort((a, b) => {
+        if (a === "Necunoscuta") return 1;
+        if (b === "Necunoscuta") return -1;
+        return a.localeCompare(b);
+    });
+
+    // Grupăm sumele pe lună (cheie "yyyy-mm", extrasă din DataEmitere) și proprietate
+    const pivot = {}; // { "2026-06": { "Alu": 123.45, "Brz": 67.8, ... } }
+    invoices.forEach(inv => {
+        const cheieLuna = lunaCheieDinData(inv.dataEmitere) || "Nedeterminat";
+        const prop = inv.proprietate || "Necunoscuta";
+        if (!pivot[cheieLuna]) pivot[cheieLuna] = {};
+        pivot[cheieLuna][prop] = (pivot[cheieLuna][prop] || 0) + (Number(inv.suma) || 0);
+    });
+
+    // Luni sortate descrescător (cea mai recentă primă), "Nedeterminat" la final
+    const luni = Object.keys(pivot).sort((a, b) => {
+        if (a === "Nedeterminat") return 1;
+        if (b === "Nedeterminat") return -1;
+        return b.localeCompare(a);
+    });
+
+    // Header
+    let headerHtml = `<th class="ps-4">Lună</th>`;
+    proprietati.forEach(p => headerHtml += `<th class="text-end">${p}</th>`);
+    headerHtml += `<th class="text-end pe-4 fw-bold">Total</th>`;
+    headerRow.innerHTML = headerHtml;
+
+    // Rânduri
+    let bodyHtml = "";
+    const totalPePropietate = {};
+    let totalGeneral = 0;
+
+    luni.forEach(cheieLuna => {
+        const eticheta = cheieLuna === "Nedeterminat" ? "Nedeterminat" : lunaEtichetaDinCheie(cheieLuna);
+        let totalRand = 0;
+        bodyHtml += `<tr><td class="ps-4 fw-bold">${eticheta}</td>`;
+        proprietati.forEach(p => {
+            const suma = (pivot[cheieLuna][p] || 0);
+            totalRand += suma;
+            totalPePropietate[p] = (totalPePropietate[p] || 0) + suma;
+            bodyHtml += `<td class="text-end">${suma > 0 ? suma.toFixed(2) + " RON" : "-"}</td>`;
+        });
+        totalGeneral += totalRand;
+        bodyHtml += `<td class="text-end pe-4 fw-bold">${totalRand.toFixed(2)} RON</td></tr>`;
+    });
+
+    // Rând de total general, pe fiecare coloană
+    bodyHtml += `<tr class="table-light"><td class="ps-4 fw-bold">TOTAL</td>`;
+    proprietati.forEach(p => {
+        bodyHtml += `<td class="text-end fw-bold">${(totalPePropietate[p] || 0).toFixed(2)} RON</td>`;
+    });
+    bodyHtml += `<td class="text-end pe-4 fw-bold text-primary">${totalGeneral.toFixed(2)} RON</td></tr>`;
+
+    tbody.innerHTML = bodyHtml;
+}
+</script>

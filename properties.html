@@ -8,7 +8,7 @@
             <button class="btn btn-outline-primary me-2" onclick="loadProperties()">
                 <i class="bi bi-arrow-clockwise me-1"></i> Actualizare
             </button>
-            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAddProperty">
+            <button class="btn btn-success" onclick="openAddModal()">
                 <i class="bi bi-plus-lg me-1"></i> Adaugă Proprietate
             </button>
         </div>
@@ -26,12 +26,13 @@
                             <th>Oraș</th>
                             <th>Proprietar</th>
                             <th>Status</th>
-                            <th class="pe-4">Observații</th>
+                            <th>Observații</th>
+                            <th class="pe-4 text-end">Acțiuni</th>
                         </tr>
                     </thead>
                     <tbody id="properties-table-body">
                         <tr>
-                            <td colspan="7" class="text-center py-5">
+                            <td colspan="8" class="text-center py-5">
                                 <div class="spinner-border text-primary" role="status"></div>
                                 <div class="text-muted small mt-2">Se încarcă proprietățile...</div>
                             </td>
@@ -47,11 +48,12 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-plus-circle me-2 text-success"></i>Proprietate Nouă</h5>
+                <h5 class="modal-title" id="modalPropertyTitle"><i class="bi bi-plus-circle me-2 text-success"></i>Proprietate Nouă</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="form-add-property" onsubmit="handleFormSubmit(event)">
                 <div class="modal-body">
+                    <input type="hidden" name="id" id="field-id" value="">
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Denumire Proprietate *</label>
                         <input type="text" class="form-control" name="denumire" required placeholder="Ex: Apartament 3 camere">
@@ -80,7 +82,7 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label small fw-bold">Status Inițial *</label>
+                        <label class="form-label small fw-bold">Status *</label>
                         <select class="form-select" name="status">
                             <option value="Activ">Activ (Disponibil)</option>
                             <option value="Inactiv">Inactiv</option>
@@ -93,7 +95,7 @@
                 </div>
                 <div class="modal-footer table-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anulează</button>
-                    <button type="submit" class="btn btn-success">Salvează Proprietatea</button>
+                    <button type="submit" class="btn btn-success" id="btn-save-property">Salvează Proprietatea</button>
                 </div>
             </form>
         </div>
@@ -102,6 +104,8 @@
 
 <script>
 // Punct de pornire automat la injectarea ferestrei
+let propertiesCache = [];
+
 (function() {
     loadProperties();
 })();
@@ -112,7 +116,7 @@ function loadProperties() {
 
     tbody.innerHTML = `
         <tr>
-            <td colspan="7" class="text-center py-5">
+            <td colspan="8" class="text-center py-5">
                 <div class="spinner-border text-primary" role="status"></div>
                 <div class="text-muted small mt-2">Se încarcă proprietățile...</div>
             </td>
@@ -121,10 +125,12 @@ function loadProperties() {
 
     google.script.run
         .withSuccessHandler(function(properties) {
-            if (!properties || properties.length === 0) {
+            propertiesCache = properties || [];
+
+            if (propertiesCache.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">
+                        <td colspan="8" class="text-center py-4 text-muted">
                             <i class="bi bi-info-circle me-1"></i> Nu există proprietăți înregistrate.
                         </td>
                     </tr>
@@ -133,7 +139,7 @@ function loadProperties() {
             }
 
             let html = "";
-            properties.forEach(prop => {
+            propertiesCache.forEach(prop => {
                 const badgeClass = prop.status === "Activ" ? "bg-success text-white" : "bg-secondary text-white";
                 html += `
                     <tr>
@@ -143,7 +149,15 @@ function loadProperties() {
                         <td>${prop.oras}</td>
                         <td>${prop.proprietar}</td>
                         <td><span class="badge ${badgeClass}">${prop.status}</span></td>
-                        <td class="pe-4 text-muted small">${prop.observatii || "-"}</td>
+                        <td class="text-muted small">${prop.observatii || "-"}</td>
+                        <td class="pe-4 text-end">
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="openEditModal('${prop.id}')" title="Editează">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="handleDeleteProperty('${prop.id}', '${String(prop.denumire || '').replace(/'/g, "\\'")}')" title="Șterge">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
                     </tr>
                 `;
             });
@@ -152,13 +166,46 @@ function loadProperties() {
         .withFailureHandler(function(err) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center py-4 text-danger">
+                    <td colspan="8" class="text-center py-4 text-danger">
                         <i class="bi bi-exclamation-triangle-fill me-1"></i> Eroare încărcare server: ${err.message}
                     </td>
                 </tr>
             `;
         })
         .apiGetProperties();
+}
+
+function openAddModal() {
+    const form = document.getElementById("form-add-property");
+    form.reset();
+    document.getElementById("field-id").value = "";
+    document.getElementById("modalPropertyTitle").innerHTML = '<i class="bi bi-plus-circle me-2 text-success"></i>Proprietate Nouă';
+    document.getElementById("btn-save-property").textContent = "Salvează Proprietatea";
+
+    const modalEl = document.getElementById('modalAddProperty');
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+function openEditModal(id) {
+    const prop = propertiesCache.find(p => p.id === id);
+    if (!prop) { alert("Proprietatea nu a fost găsită în listă. Actualizează pagina și încearcă din nou."); return; }
+
+    const form = document.getElementById("form-add-property");
+    form.reset();
+    document.getElementById("field-id").value = prop.id;
+    form.querySelector('[name="denumire"]').value = prop.denumire || "";
+    form.querySelector('[name="tip"]').value = prop.tip || "Apartament";
+    form.querySelector('[name="adresa"]').value = prop.adresa || "";
+    form.querySelector('[name="oras"]').value = prop.oras || "";
+    form.querySelector('[name="proprietar"]').value = prop.proprietar || "";
+    form.querySelector('[name="status"]').value = prop.status || "Activ";
+    form.querySelector('[name="observatii"]').value = prop.observatii || "";
+
+    document.getElementById("modalPropertyTitle").innerHTML = '<i class="bi bi-pencil-square me-2 text-primary"></i>Editează Proprietate';
+    document.getElementById("btn-save-property").textContent = "Salvează Modificările";
+
+    const modalEl = document.getElementById('modalAddProperty');
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
 }
 
 function handleFormSubmit(event) {
@@ -172,6 +219,7 @@ function handleFormSubmit(event) {
     submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Se salvează...`;
 
     const formData = new FormData(form);
+    const id = formData.get("id");
     const propertyObject = {
         denumire: formData.get("denumire"),
         tip: formData.get("tip"),
@@ -182,28 +230,47 @@ function handleFormSubmit(event) {
         observatii: formData.get("observatii")
     };
 
+    function onSuccess(response) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
+
+        if (response && response.success) {
+            const modalEl = document.getElementById('modalAddProperty');
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            form.reset();
+            loadProperties();
+        } else {
+            alert("Eroare la salvare.");
+        }
+    }
+
+    function onFailure(err) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
+        alert("Eroare de comunicare cu serverul: " + err.message);
+    }
+
+    if (id) {
+        google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiUpdateProperty(id, propertyObject);
+    } else {
+        google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure).apiSaveProperty(propertyObject);
+    }
+}
+
+function handleDeleteProperty(id, denumire) {
+    if (!confirm('Sigur ștergi proprietatea "' + denumire + '"? Acțiunea nu poate fi anulată.')) return;
+
     google.script.run
         .withSuccessHandler(function(response) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalBtnText;
-
             if (response && response.success) {
-                // Închidem modalul manual schimbând atributele dacă Bootstrap nu este instanțiat global
-                const modalEl = document.getElementById('modalAddProperty');
-                const modalBtnClose = modalEl.querySelector('.btn-close');
-                if (modalBtnClose) modalBtnClose.click();
-                
-                form.reset();
                 loadProperties();
             } else {
-                alert("Eroare la salvare.");
+                alert("Eroare la ștergere.");
             }
         })
         .withFailureHandler(function(err) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalBtnText;
             alert("Eroare de comunicare cu serverul: " + err.message);
         })
-        .apiSaveProperty(propertyObject);
+        .apiDeleteProperty(id);
 }
 </script>
