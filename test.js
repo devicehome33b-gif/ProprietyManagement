@@ -1,0 +1,3 @@
+function TEST_ENGIE_FUNCTION_VISIBLE_2() {
+  Logger.log("FUNCTION VISIBLE 2");
+}

@@ -1058,3 +1058,434 @@ function testCasaMamaMetadata() {
   Logger.log("SFARSIT TEST");
   Logger.log("========================================");
 }
+function importEngieInvoiceHistory() {
+
+  Logger.log("========================================");
+  Logger.log("IMPORT ENGIE - ISTORIC FACTURI");
+  Logger.log("========================================");
+
+  if (
+    typeof CONFIG === "undefined" ||
+    !CONFIG.ENGIE_API
+  ) {
+    throw new Error("CONFIG.ENGIE_API nu există.");
+  }
+
+  const email = CONFIG.ENGIE_API.EMAIL;
+  const password = CONFIG.ENGIE_API.PASSWORD;
+
+  if (!email || !password) {
+    throw new Error("Lipsesc credențialele ENGIE.");
+  }
+
+  // ========================================
+  // 1. LOGIN
+  // ========================================
+
+  const tokens = loginToEngie(email, password);
+
+  if (!tokens || !tokens.accessToken) {
+    throw new Error("Login ENGIE fără access token.");
+  }
+
+  Logger.log("LOGIN OK");
+
+  // ========================================
+  // 2. LOCURI DE CONSUM
+  // ========================================
+
+  const placesResponse =
+    getEngiePlacesOfConsumption(
+      tokens.accessToken
+    );
+
+  const rawPlaces =
+    extractEngiePlaces_(
+      placesResponse
+    );
+
+  Logger.log(
+    "Locuri găsite: " +
+    rawPlaces.length
+  );
+
+  if (!rawPlaces.length) {
+    throw new Error(
+      "ENGIE nu a returnat locuri de consum."
+    );
+  }
+
+  // ========================================
+  // 3. PERIOADA
+  // ========================================
+
+  const period =
+    getEngieImportPeriod_();
+
+  Logger.log(
+    "Perioada: " +
+    period.startDate +
+    " -> " +
+    period.endDate
+  );
+
+  // ========================================
+  // 4. REZULTAT
+  // ========================================
+
+  const rezultat = {
+    locuri: 0,
+    facturiGasite: 0,
+    importate: 0,
+    actualizate: 0,
+    ignorate: 0,
+    erori: 0,
+    detalii: []
+  };
+
+  // ========================================
+  // 5. PARCURGERE LOCURI
+  // ========================================
+
+  rawPlaces.forEach(function(rawPlace, index) {
+
+    rezultat.locuri++;
+
+    Logger.log("");
+    Logger.log("----------------------------------------");
+    Logger.log(
+      "LOC " +
+      (index + 1) +
+      "/" +
+      rawPlaces.length
+    );
+    Logger.log("----------------------------------------");
+
+    const place =
+      normalizeEngiePlace_(
+        rawPlace
+      );
+
+    if (!place) {
+
+      Logger.log(
+        "SKIP: loc invalid."
+      );
+
+      rezultat.ignorate++;
+
+      return;
+    }
+
+    Logger.log(
+      "Proprietate: " +
+      place.alias
+    );
+
+    Logger.log(
+      "PA: " +
+      place.pa
+    );
+
+    Logger.log(
+      "POC: " +
+      place.poc
+    );
+
+    Logger.log(
+      "Adresă: " +
+      place.addressInline
+    );
+
+    // ======================================
+    // PROTECȚIE PA / POC
+    // ======================================
+
+    if (!place.pa || !place.poc) {
+
+      Logger.log(
+        "SKIP: PA sau POC lipsă."
+      );
+
+      rezultat.ignorate++;
+
+      return;
+    }
+
+    // ======================================
+    // ISTORIC FACTURI
+    // ======================================
+
+    try {
+
+      const history =
+        getEngieInvoiceHistory_(
+          tokens.accessToken,
+          place.poc,
+          place.pa,
+          period.startDate,
+          period.endDate
+        );
+
+      if (!history) {
+
+        Logger.log(
+          "ISTORIC: răspuns gol."
+        );
+
+        return;
+      }
+
+      const invoices =
+        extractEngieInvoices_(
+          history
+        );
+
+      Logger.log(
+        "Facturi găsite: " +
+        invoices.length
+      );
+
+      rezultat.facturiGasite += invoices.length;
+
+      // ====================================
+      // FACTURI
+      // ====================================
+
+      invoices.forEach(function(invoice) {
+
+        try {
+
+          const invoiceNumber =
+            engieString_(
+              invoice.invoice_number ||
+              invoice.invoiceNumber ||
+              invoice.number
+            );
+
+          if (!invoiceNumber) {
+
+            Logger.log(
+              "SKIP factura fără număr."
+            );
+
+            rezultat.ignorate++;
+
+            return;
+          }
+
+          const invoicedAt =
+            engieString_(
+              invoice.invoiced_at ||
+              invoice.invoice_date ||
+              invoice.invoiceDate
+            );
+
+          const dueDate =
+            engieString_(
+              invoice.due_date ||
+              invoice.dueDate
+            );
+
+          const total =
+            invoice.total !== undefined
+              ? invoice.total
+              : (
+                  invoice.amount !== undefined
+                    ? invoice.amount
+                    : ""
+                );
+
+          const downloadValue =
+            getEngieInvoiceDownloadValue_(
+              invoice
+            );
+
+          // =================================
+          // PAYLOAD PENTRU FACTURI
+          // =================================
+
+          const payload = {
+
+            furnizor: "ENGIE",
+
+            // Proprietatea vine direct
+            // din locul de consum ENGIE.
+            proprietate: place.alias,
+
+            codClient:
+              invoice.customer_code ||
+              invoice.client_code ||
+              invoice.clientCode ||
+              "",
+
+            numarFactura:
+              invoiceNumber,
+
+            perioada:
+              invoice.period ||
+              invoice.billing_period ||
+              "",
+
+            dataEmitere:
+              invoicedAt,
+
+            dataScadenta:
+              dueDate,
+
+            suma:
+              parseEngieAmount_(total),
+
+            moneda:
+              "RON",
+
+            sursaImport:
+              "ENGIE API",
+
+            // Nu este folosit încă de
+            // importaFacturaExterna_,
+            // dar îl păstrăm în payload
+            // pentru etapa următoare.
+            downloadValue:
+              downloadValue || "",
+
+            pa:
+              place.pa,
+
+            poc:
+              place.poc
+          };
+
+          Logger.log(
+            "Import factura ENGIE: " +
+            invoiceNumber +
+            " | " +
+            payload.suma +
+            " RON"
+          );
+
+          // =================================
+          // IMPORT CENTRALIZAT
+          // =================================
+
+          const rezultatImport =
+            importaFacturaExterna_(
+              payload
+            );
+
+          if (
+            rezultatImport.actiune ===
+            "creat"
+          ) {
+
+            rezultat.importate++;
+
+          } else if (
+            rezultatImport.actiune ===
+            "actualizat"
+          ) {
+
+            rezultat.actualizate++;
+
+          } else {
+
+            rezultat.ignorate++;
+
+          }
+
+          rezultat.detalii.push({
+
+            proprietate:
+              place.alias,
+
+            poc:
+              place.poc,
+
+            pa:
+              place.pa,
+
+            factura:
+              invoiceNumber,
+
+            suma:
+              payload.suma,
+
+            actiune:
+              rezultatImport.actiune,
+
+            download:
+              downloadValue
+                ? true
+                : false
+
+          });
+
+        } catch (invoiceError) {
+
+          rezultat.erori++;
+
+          Logger.log(
+            "EROARE FACTURA ENGIE: " +
+            invoiceError.toString()
+          );
+
+        }
+
+      });
+
+    } catch (historyError) {
+
+      rezultat.erori++;
+
+      Logger.log(
+        "EROARE ISTORIC ENGIE: " +
+        historyError.toString()
+      );
+
+    }
+
+  });
+
+  // ========================================
+  // REZUMAT
+  // ========================================
+
+  Logger.log("");
+  Logger.log("========================================");
+  Logger.log("IMPORT ENGIE TERMINAT");
+  Logger.log("========================================");
+
+  Logger.log(
+    "Locuri: " +
+    rezultat.locuri
+  );
+
+  Logger.log(
+    "Facturi găsite: " +
+    rezultat.facturiGasite
+  );
+
+  Logger.log(
+    "Importate: " +
+    rezultat.importate
+  );
+
+  Logger.log(
+    "Actualizate: " +
+    rezultat.actualizate
+  );
+
+  Logger.log(
+    "Ignorate: " +
+    rezultat.ignorate
+  );
+
+  Logger.log(
+    "Erori: " +
+    rezultat.erori
+  );
+
+  Logger.log("========================================");
+
+  return rezultat;
+}

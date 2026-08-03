@@ -2220,7 +2220,7 @@ return null;
 
 * Scrie/actualizează o factură.
   */
-  function saveInvoiceRow_(
+  function saveEngieInvoiceRow_(
   invoiceData
   ) {
 
@@ -2231,7 +2231,7 @@ typeof invoiceData !== "object"
 
 
 throw new Error(
-  "saveInvoiceRow_: invoiceData invalid."
+  "saveEngieInvoiceRow_: invoiceData invalid."
 );
 
 
@@ -3446,7 +3446,7 @@ index
 
 
                 const updated =
-                  saveInvoiceRow_(
+                  saveEngieInvoiceRow_(
                     invoiceData
                   );
 
@@ -3476,7 +3476,7 @@ index
 
 
           const savedExisting =
-            saveInvoiceRow_(
+            saveEngieInvoiceRow_(
               invoiceData
             );
 
@@ -3573,7 +3573,7 @@ index
 
 
         const sheetResult =
-          saveInvoiceRow_(
+          saveEngieInvoiceRow_(
             invoiceData
           );
 

@@ -1,6 +1,6 @@
 ﻿function getSheet(sheetName) {
   // ID-ul tău furnizat
-  const SPREADSHEET_ID = "19gfMS0_aB96ZsTSbu_dw-37lJMyUZmT_rkbwSul82YS6rXEwkfYBBIbD";
+  const SPREADSHEET_ID = "17tD-ZjHze43xjuyhHd3LhKmYUNjb4NZXAujrAA9BxOQ";
   
   // Verificăm dacă ID-ul este un string valid
   if (!SPREADSHEET_ID || SPREADSHEET_ID === "") {
