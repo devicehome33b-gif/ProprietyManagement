@@ -4,6 +4,11 @@
 
 const CONFIG = {
 
+  // ==========================================
+  // GOOGLE SPREADSHEET
+  // ==========================================
+  SPREADSHEET_ID: "17tD-ZjHze43xjuyhHd3LhKmYUNjb4NZXAujrAA9BxOQ",
+
   // Doar sheet-urile folosite în acest modul.
   SHEETS: {
     PROPERTIES: "Proprietati",

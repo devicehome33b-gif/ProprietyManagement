@@ -18,7 +18,11 @@ const CONFIG = {
   // GOOGLE DRIVE
   // ==========================================
   DRIVE: {
-    ROOT_FOLDER_ID: "1OvmyyU6-GM2lBTRw9Jf3hXL75DWYc4p9"
+    // Folderul principal în care sunt puse toate facturile.
+    ROOT_FOLDER_ID: "1OvmyyU6-GM2lBTRw9Jf3hXL75DWYc4p9",
+
+    // Limba OCR
+    OCR_LANGUAGE: "ro"
   },
 
   // ==========================================

@@ -3695,7 +3695,7 @@ return stats;
 * ============================================================
   */
 
-function testEngieConnection() {
+function testEngieLoginJwtDebug() {
 
   Logger.log("========================================");
   Logger.log("TEST ENGIE LOGIN - DEBUG JWT");
@@ -4966,6 +4966,10 @@ throw new Error(
 
 }
 
+const invoices =
+extractEngieInvoices_(
+history
+);
 
 if (
 !invoices.length
@@ -5366,6 +5370,59 @@ Logger.log(
 Logger.log(
 "========================================"
 );
+
+const componente = [
+  { nume: "LOGIN",                fn: testEngieConnection },
+  { nume: "PLACES OF CONSUMPTION", fn: testEngiePlacesOfConsumption },
+  { nume: "INVOICE HISTORY",       fn: testEngieInvoiceHistoryFromPlaces },
+  { nume: "PDF DOWNLOAD",          fn: testEngieInvoicePdfDownload },
+  { nume: "DRIVE ACCESS",          fn: testEngieDriveAccess },
+  { nume: "INVOICES SHEET",        fn: testEngieInvoicesSheet }
+];
+
+const rezultate = [];
+
+componente.forEach(function(componenta) {
+
+  Logger.log("");
+  Logger.log("---------- " + componenta.nume + " ----------");
+
+  try {
+
+    componenta.fn();
+
+    Logger.log(componenta.nume + ": PASS");
+
+    rezultate.push({ componenta: componenta.nume, status: "PASS" });
+
+  } catch (err) {
+
+    Logger.log(componenta.nume + ": FAIL - " + err.message);
+
+    rezultate.push({
+      componenta: componenta.nume,
+      status: "FAIL",
+      eroare: err.message
+    });
+  }
+});
+
+Logger.log("");
+Logger.log("========================================");
+Logger.log("REZUMAT TEST COMPONENTE");
+Logger.log("========================================");
+
+rezultate.forEach(function(r) {
+
+  Logger.log(
+    r.componenta + ": " + r.status +
+    (r.eroare ? " (" + r.eroare + ")" : "")
+  );
+});
+
+Logger.log("========================================");
+
+return rezultate;
 }
 function testEngiePlacesJwtDebug() {
 
