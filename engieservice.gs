@@ -4966,15 +4966,6 @@ throw new Error(
 
 }
 
-const invoices =
-extractEngieInvoices_(
-history
-);
-
-Logger.log(
-"Facturi găsite: " +
-invoices.length
-);
 
 if (
 !invoices.length
@@ -5736,8 +5727,6 @@ testEngieDriveAccess();
 Logger.log(
 "DRIVE OK"
 );
-
-testEngieInvoicesSheet();
 
 Logger.log(
 "SHEET OK"
