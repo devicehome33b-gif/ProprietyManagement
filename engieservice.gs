@@ -5366,6 +5366,7 @@ Logger.log(
 Logger.log(
 "========================================"
 );
+}
 function testEngiePlacesJwtDebug() {
 
   Logger.log("========================================");
@@ -5716,39 +5717,6 @@ function testEngieConnection() {
   Logger.log("========================================");
 }
 
-testEngieInvoiceHistoryFromPlaces();
-
-Logger.log(
-"HISTORY OK"
-);
-
-testEngieDriveAccess();
-
-Logger.log(
-"DRIVE OK"
-);
-
-Logger.log(
-"SHEET OK"
-);
-
-Logger.log(
-"========================================"
-);
-
-Logger.log(
-"TOATE TESTELE COMPONENTELOR AU FOST EXECUTATE"
-);
-
-Logger.log(
-"========================================"
-);
-}
-
-
-  Logger.log("========================================");
-  Logger.log("TEST ENGIE SHEET FACTURI");
-  Logger.log("========================================");
   function testEngieHistorySinglePlace() {
 
   Logger.log("========================================");
